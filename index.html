@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slapshot Saga</title>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { background:#070d1a; display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; }
+    canvas { display:block; cursor:pointer; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════════════
+const C = {
+  W:480, H:720, COLS:8, ROWS:8, TS:52, OX:32, OY:162,
+  TYPES:6, FALL:0.22, PTS:60,
+  BOOSTER_SHUFFLE:2, BOOSTER_CONTINUE:5,
+  CLR:{
+    BG:'#0a1628', BLUE:'#1b4f8a', BLUE2:'#2e86c1', BLUE3:'#5dade2',
+    GOLD:'#f39c12', RED:'#e74c3c', GREEN:'#2ecc71', WHITE:'#ffffff',
+    GRID:'rgba(174,214,241,0.22)',
+  },
+};
+
+const TILE_DEFS = [
+  {name:'Puck',   bg:'#1a1a2e', hi:'#5a5a8e'},
+  {name:'Stick',  bg:'#7d3c0a', hi:'#c0874a'},
+  {name:'Helmet', bg:'#c0392b', hi:'#e74c3c'},
+  {name:'Skate',  bg:'#3a3a3a', hi:'#aaaaaa'},
+  {name:'Glove',  bg:'#b84a00', hi:'#e07030'},
+  {name:'Jersey', bg:'#154360', hi:'#2e86c1'},
+];
+
+// ════════════════════════════════════════════════════════════════════
+// 2026 NHL TEAMS — 32 teams, 4 divisions
+// ════════════════════════════════════════════════════════════════════
+const NHL_TEAMS = [
+  // EASTERN — Atlantic
+  {id:'BOS',city:'Boston',      name:'Bruins',        full:'Boston Bruins',          c:['#FFB81C','#111111'], conf:'E', div:'Atlantic'},
+  {id:'BUF',city:'Buffalo',     name:'Sabres',        full:'Buffalo Sabres',         c:['#003087','#FCB514'], conf:'E', div:'Atlantic'},
+  {id:'DET',city:'Detroit',     name:'Red Wings',     full:'Detroit Red Wings',      c:['#CE1126','#FFFFFF'], conf:'E', div:'Atlantic'},
+  {id:'FLA',city:'Florida',     name:'Panthers',      full:'Florida Panthers',       c:['#041E42','#C8102E'], conf:'E', div:'Atlantic'},
+  {id:'MTL',city:'Montréal',    name:'Canadiens',     full:'Montréal Canadiens',     c:['#AF1E2D','#192168'], conf:'E', div:'Atlantic'},
+  {id:'OTT',city:'Ottawa',      name:'Senators',      full:'Ottawa Senators',        c:['#C52032','#C69214'], conf:'E', div:'Atlantic'},
+  {id:'TBL',city:'Tampa Bay',   name:'Lightning',     full:'Tampa Bay Lightning',    c:['#002868','#FFFFFF'], conf:'E', div:'Atlantic'},
+  {id:'TOR',city:'Toronto',     name:'Maple Leafs',   full:'Toronto Maple Leafs',    c:['#003E7E','#FFFFFF'], conf:'E', div:'Atlantic'},
+  // EASTERN — Metropolitan
+  {id:'CAR',city:'Carolina',    name:'Hurricanes',    full:'Carolina Hurricanes',    c:['#CC0000','#111111'], conf:'E', div:'Metro'},
+  {id:'CBJ',city:'Columbus',    name:'Blue Jackets',  full:'Columbus Blue Jackets',  c:['#002654','#CE1126'], conf:'E', div:'Metro'},
+  {id:'NJD',city:'New Jersey',  name:'Devils',        full:'New Jersey Devils',      c:['#CE1126','#111111'], conf:'E', div:'Metro'},
+  {id:'NYI',city:'Islanders',   name:'Islanders',     full:'NY Islanders',           c:['#00539B','#F47D30'], conf:'E', div:'Metro'},
+  {id:'NYR',city:'NY Rangers',  name:'Rangers',       full:'New York Rangers',       c:['#0038A8','#CE1126'], conf:'E', div:'Metro'},
+  {id:'PHI',city:'Philadelphia',name:'Flyers',        full:'Philadelphia Flyers',    c:['#F74902','#111111'], conf:'E', div:'Metro'},
+  {id:'PIT',city:'Pittsburgh',  name:'Penguins',      full:'Pittsburgh Penguins',    c:['#FCB514','#111111'], conf:'E', div:'Metro'},
+  {id:'WSH',city:'Washington',  name:'Capitals',      full:'Washington Capitals',    c:['#C8102E','#041E42'], conf:'E', div:'Metro'},
+  // WESTERN — Central
+  {id:'CHI',city:'Chicago',     name:'Blackhawks',    full:'Chicago Blackhawks',     c:['#CF0A2C','#111111'], conf:'W', div:'Central'},
+  {id:'COL',city:'Colorado',    name:'Avalanche',     full:'Colorado Avalanche',     c:['#6F263D','#236192'], conf:'W', div:'Central'},
+  {id:'DAL',city:'Dallas',      name:'Stars',         full:'Dallas Stars',           c:['#006847','#8F8F8C'], conf:'W', div:'Central'},
+  {id:'MIN',city:'Minnesota',   name:'Wild',          full:'Minnesota Wild',         c:['#154734','#A6192E'], conf:'W', div:'Central'},
+  {id:'NSH',city:'Nashville',   name:'Predators',     full:'Nashville Predators',    c:['#FFB81C','#041E42'], conf:'W', div:'Central'},
+  {id:'STL',city:'St. Louis',   name:'Blues',         full:'St. Louis Blues',        c:['#002F87','#FCB514'], conf:'W', div:'Central'},
+  {id:'UTA',city:'Utah',        name:'Hockey Club',   full:'Utah Hockey Club',       c:['#6CACE4','#010101'], conf:'W', div:'Central'},
+  {id:'WPG',city:'Winnipeg',    name:'Jets',          full:'Winnipeg Jets',          c:['#041E42','#AC9351'], conf:'W', div:'Central'},
+  // WESTERN — Pacific
+  {id:'ANA',city:'Anaheim',     name:'Ducks',         full:'Anaheim Ducks',          c:['#FC4C02','#111111'], conf:'W', div:'Pacific'},
+  {id:'CGY',city:'Calgary',     name:'Flames',        full:'Calgary Flames',         c:['#C8102E','#F1BE48'], conf:'W', div:'Pacific'},
+  {id:'EDM',city:'Edmonton',    name:'Oilers',        full:'Edmonton Oilers',        c:['#041E42','#FC4C02'], conf:'W', div:'Pacific'},
+  {id:'LAK',city:'Los Angeles', name:'Kings',         full:'Los Angeles Kings',      c:['#111111','#A2AAAD'], conf:'W', div:'Pacific'},
+  {id:'SJS',city:'San Jose',    name:'Sharks',        full:'San Jose Sharks',        c:['#006D75','#EA7200'], conf:'W', div:'Pacific'},
+  {id:'SEA',city:'Seattle',     name:'Kraken',        full:'Seattle Kraken',         c:['#001628','#99D9D9'], conf:'W', div:'Pacific'},
+  {id:'VAN',city:'Vancouver',   name:'Canucks',       full:'Vancouver Canucks',      c:['#00205B','#00843D'], conf:'W', div:'Pacific'},
+  {id:'VGK',city:'Vegas',       name:'Golden Knights',full:'Vegas Golden Knights',   c:['#B4975A','#333F48'], conf:'W', div:'Pacific'},
+];
+
+// ════════════════════════════════════════════════════════════════════
+// LEVEL DATA — 20 levels across 4 chapters
+// ════════════════════════════════════════════════════════════════════
+const CHAPTERS = [
+  {name:'Regular Season', emoji:'🏒', color:'#2980b9', lvStart:1, lvEnd:3,
+   nodes:[{x:90,y:270},{x:240,y:190},{x:390,y:270}]},
+  {name:'The Finals',     emoji:'🏆', color:'#f39c12', lvStart:4, lvEnd:7,
+   nodes:[{x:62,y:290},{x:182,y:210},{x:302,y:290},{x:418,y:210}]},
+];
+
+const LEVELS = [
+  // ── Regular Season ──
+  {id:1, name:'Warmup',          moves:22, ice:0,  power:false, goal:{type:'score', target:500  }, tip:'Match 3+ tiles to score!'},
+  {id:2, name:'Home Game',       moves:22, ice:6,  power:true,  goal:{type:'score', target:1200 }, tip:'Match next to refs to chase them off the ice!'},
+  {id:3, name:'Rivalry Night',   moves:20, ice:10, power:true,  goal:{type:'ice',   target:10   }, tip:'Chase all the referees off the ice to win!'},
+  // ── The Finals ──
+  {id:4, name:'Finals — Game 1', moves:22, ice:8,  power:true,  goal:{type:'score', target:2000 }, tip:'Detonate ⚡ Power Pucks for huge points.'},
+  {id:5, name:'Finals — Game 2', moves:24, ice:14, power:true,  goal:{type:'ice',   target:14   }, tip:'Chase every referee off the ice to win!'},
+  {id:6, name:'Finals — Game 3', moves:20, ice:12, power:true,  goal:{type:'score', target:3500 }, tip:'One more win — every move counts!'},
+  {id:7, name:'CHAMPIONSHIP!',   moves:22, ice:16, power:true,  goal:{type:'score', target:5000 }, tip:'Raise the Stanley Cup! 🏆'},
+];
+
+const DAILY_LEVEL = {id:0, name:'Daily Challenge', moves:20, ice:8, power:true, goal:{type:'score',target:3000}, tip:'A fresh board every day!'};
+
+// ════════════════════════════════════════════════════════════════════
+// PLAYER ROSTERS  [star scorer, playmaker/scorer2, blueliner, physical]
+// ════════════════════════════════════════════════════════════════════
+const ROSTERS = {
+  // EASTERN — Atlantic
+  BOS:['David Pastrnak','Brad Marchand','Charlie McAvoy','Trent Frederic'],
+  BUF:['Tage Thompson','JJ Peterka','Rasmus Dahlin','Dylan Cozens'],
+  DET:['Dylan Larkin','Lucas Raymond','Moritz Seider','Alex DeBrincat'],
+  FLA:['Matthew Tkachuk','Aleksander Barkov','Aaron Ekblad','Sam Reinhart'],
+  MTL:['Nick Suzuki','Cole Caufield','Lane Hutson','Juraj Slafkovsky'],
+  OTT:['Brady Tkachuk','Tim Stützle','Jake Sanderson','Drake Batherson'],
+  TBL:['Nikita Kucherov','Brayden Point','Victor Hedman','Jake Guentzel'],
+  TOR:['Auston Matthews','Mitch Marner','Morgan Rielly','William Nylander'],
+  // EASTERN — Metropolitan
+  CAR:['Sebastian Aho','Andrei Svechnikov','Brent Burns','Jordan Martinook'],
+  CBJ:['Boone Jenner','Kent Johnson','Zach Werenski','Kirill Marchenko'],
+  NJD:['Jack Hughes','Nico Hischier','Dougie Hamilton','Timo Meier'],
+  NYI:['Mathew Barzal','Bo Horvat','Noah Dobson','Brock Nelson'],
+  NYR:['Artemi Panarin','Chris Kreider','Adam Fox','Alexis Lafrenière'],
+  PHI:['Travis Konecny','Sean Couturier','Cam York','Nicolas Deslauriers'],
+  PIT:['Sidney Crosby','Evgeni Malkin','Kris Letang','Bryan Rust'],
+  WSH:['Alex Ovechkin','Dylan Strome','John Carlson','Tom Wilson'],
+  // WESTERN — Central
+  CHI:['Connor Bedard','Frank Nazar','Seth Jones','Taylor Hall'],
+  COL:['Nathan MacKinnon','Mikko Rantanen','Cale Makar','Valeri Nichushkin'],
+  DAL:['Jason Robertson','Roope Hintz','Miro Heiskanen','Tyler Seguin'],
+  MIN:['Kirill Kaprizov','Matt Boldy','Jared Spurgeon','Mats Zuccarello'],
+  NSH:['Filip Forsberg','Jonathan Marchessault','Roman Josi','Steven Stamkos'],
+  STL:['Robert Thomas','Jordan Kyrou','Torey Krug','Brayden Schenn'],
+  UTA:['Clayton Keller','Dylan Guenther','Mikhail Sergachev','Nick Schmaltz'],
+  WPG:['Mark Scheifele','Kyle Connor','Josh Morrissey','Nikolaj Ehlers'],
+  // WESTERN — Pacific
+  ANA:['Mason McTavish','Leo Carlsson','Cam Fowler','Frank Vatrano'],
+  CGY:['Nazem Kadri','Mikael Backlund','MacKenzie Weegar','Yegor Sharangovich'],
+  EDM:['Connor McDavid','Leon Draisaitl','Evan Bouchard','Zach Hyman'],
+  LAK:['Anze Kopitar','Quinton Byfield','Drew Doughty','Adrian Kempe'],
+  SJS:['Macklin Celebrini','Tomas Hertl','Will Smith','William Eklund'],
+  SEA:['Matty Beniers','Jordan Eberle','Vince Dunn','Andre Burakovsky'],
+  VAN:['Elias Pettersson','Quinn Hughes','Brock Boeser','JT Miller'],
+  VGK:['Jack Eichel','Mark Stone','Alex Pietrangelo','William Karlsson'],
+};
+
+function getLevelTheme(lvId, teamId) {
+  if (!teamId) return null;
+  const r = ROSTERS[teamId];
+  if (!r) return null;
+  const [p1, p2, p3, p4] = r;
+  switch(lvId) {
+    case 1: return `Help ${p1} score the opening goal of the season`;
+    case 2: return `Set up ${p2} for 2 assists in tonight's home game`;
+    case 3: return `Chase the refs so ${p3} can take control of the ice`;
+    case 4: return `Feed ${p1} for a crucial Championship opener goal`;
+    case 5: return `${p4} needs room to fight — clear every ref!`;
+    case 6: return `Help ${p2} complete a hat trick in Game 3`;
+    case 7: return `Lift the Stanley Cup alongside ${p1}!`;
+    default: return null;
+  }
+}
+
+const MAP_R = 34;
+
+// ════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════
+function teamById(id)    { return NHL_TEAMS.find(t=>t.id===id)||null; }
+function pad2(n)         { return String(n).padStart(2,'0'); }
+function todayStr()      { const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function dailySeed()     { const d=new Date(); return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+function goalLabel(lv)   { return lv.goal.type==='score'?`Score ${lv.goal.target.toLocaleString()}`:`Chase off ${lv.goal.target} refs 🧑‍⚖️`; }
+function hexToRgba(hex,a){ const n=parseInt(hex.replace('#',''),16); return `rgba(${n>>16},${(n>>8)&0xff},${n&0xff},${a})`; }
+
+function mkRng(seed) {
+  let s=(seed^0xdeadbeef)>>>0;
+  return ()=>{
+    s=(s+0x6D2B79F5)>>>0;
+    let t=Math.imul(s^s>>>15,1|s);
+    t=(t+Math.imul(t^t>>>7,61|t))^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+function getConfTeams(conf) {
+  const div1 = conf==='E'?'Atlantic':'Central';
+  const div2 = conf==='E'?'Metro':'Pacific';
+  const sort = (a,b)=>a.city.localeCompare(b.city);
+  return [
+    ...NHL_TEAMS.filter(t=>t.conf===conf&&t.div===div1).sort(sort),
+    ...NHL_TEAMS.filter(t=>t.conf===conf&&t.div===div2).sort(sort),
+  ];
+}
+
+function teamBtnPos(i) {
+  const bw=Math.floor((C.W-20)/2);
+  const isDiv2=i>=8, li=isDiv2?i-8:i;
+  const col=li%2, row=Math.floor(li/2);
+  return {
+    bx: 8+col*(bw+4),
+    by: 162+row*48+(isDiv2?4*48+22:0),
+    bw, bh:44,
+  };
+}
+
+function rrect(ctx,x,y,w,h,r) {
+  if (typeof r==='object') {
+    const {tl=0,tr=0,br=0,bl=0}=r;
+    ctx.beginPath();
+    ctx.moveTo(x+tl,y);ctx.lineTo(x+w-tr,y);ctx.quadraticCurveTo(x+w,y,x+w,y+tr);
+    ctx.lineTo(x+w,y+h-br);ctx.quadraticCurveTo(x+w,y+h,x+w-br,y+h);
+    ctx.lineTo(x+bl,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-bl);
+    ctx.lineTo(x,y+tl);ctx.quadraticCurveTo(x,y,x+tl,y);ctx.closePath();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+}
+function lighten(hex,amt) {
+  const n=parseInt(hex.replace('#',''),16);
+  return `rgb(${Math.min(255,(n>>16)+amt)},${Math.min(255,((n>>8)&0xff)+amt)},${Math.min(255,(n&0xff)+amt)})`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// TILE
+// ════════════════════════════════════════════════════════════════════
+class Tile {
+  constructor(type,col,row){
+    this.type=type;this.col=col;this.row=row;
+    this.x=C.OX+col*C.TS;this.y=C.OY+row*C.TS;
+    this.tx=this.x;this.ty=this.y;
+    this.alpha=1;this.scale=1;this.matched=false;
+    this.isIce=(type===6);this.isPower=(type===7);
+    this.iceHP=this.isIce?1:0;this.pulse=0;
+  }
+  setTarget(col,row){this.col=col;this.row=row;this.tx=C.OX+col*C.TS;this.ty=C.OY+row*C.TS;}
+  update(dt){
+    const dx=this.tx-this.x,dy=this.ty-this.y,sp=C.FALL*dt*60;
+    this.x+=Math.abs(dx)>0.5?dx*sp:dx;this.y+=Math.abs(dy)>0.5?dy*sp:dy;
+    if(this.isPower)this.pulse=(this.pulse+dt*2.8)%(Math.PI*2);
+  }
+  settled(){return Math.abs(this.x-this.tx)<1&&Math.abs(this.y-this.ty)<1;}
+}
+
+// ════════════════════════════════════════════════════════════════════
+// BOARD
+// ════════════════════════════════════════════════════════════════════
+class Board {
+  constructor(level,rng=null){
+    this.level=level;this._r=rng||(()=>Math.random());this.g=[];this._init();
+  }
+  _ri(n){return Math.floor(this._r()*n);}
+
+  _init(){
+    for(let r=0;r<C.ROWS;r++)this.g[r]=new Array(C.COLS).fill(null);
+    this._placeIce();this._fill();
+    for(let a=0;a<50&&this._findMatches().length;a++)this._fill();
+  }
+  _placeIce(){
+    const n=this.level.ice||0;if(!n)return;
+    const pool=[];
+    for(let r=3;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++)pool.push([col,r]);
+    for(let i=pool.length-1;i>0;i--){const j=this._ri(i+1);[pool[i],pool[j]]=[pool[j],pool[i]];}
+    for(let i=0;i<Math.min(n,pool.length);i++){const[col,r]=pool[i];this.g[r][col]=new Tile(6,col,r);}
+  }
+  _fill(){
+    for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++)if(!this.g[r][col]){
+      let t;do{t=this._ri(C.TYPES);}while(this._wouldMatch(col,r,t));
+      this.g[r][col]=new Tile(t,col,r);
+    }
+  }
+  _wouldMatch(col,r,t){
+    const get=(c,rr)=>{const tile=this.at(c,rr);return tile&&!tile.isIce?tile.type:-1;};
+    if(col>=2&&get(col-1,r)===t&&get(col-2,r)===t)return true;
+    if(r>=2&&get(col,r-1)===t&&get(col,r-2)===t)return true;
+    return false;
+  }
+  at(col,r){if(col<0||col>=C.COLS||r<0||r>=C.ROWS)return null;return this.g[r][col];}
+
+  _findMatches(){
+    const set=new Set();
+    for(let r=0;r<C.ROWS;r++){let run=1;for(let col=1;col<=C.COLS;col++){const a=this.at(col-1,r),b=this.at(col,r);if(a&&b&&!a.isIce&&!b.isIce&&a.type===b.type){run++;}else{if(run>=3)for(let k=col-run;k<col;k++)set.add(`${k},${r}`);run=1;}}}
+    for(let col=0;col<C.COLS;col++){let run=1;for(let r=1;r<=C.ROWS;r++){const a=this.at(col,r-1),b=this.at(col,r);if(a&&b&&!a.isIce&&!b.isIce&&a.type===b.type){run++;}else{if(run>=3)for(let k=r-run;k<r;k++)set.add(`${col},${k}`);run=1;}}}
+    return[...set].map(k=>{const[c,r]=k.split(',').map(Number);return{col:c,row:r};});
+  }
+  _findGroups(){
+    const groups=[];
+    for(let r=0;r<C.ROWS;r++){let run=[];for(let col=0;col<=C.COLS;col++){const tile=this.at(col,r),prev=run.length?this.at(run[run.length-1].col,r):null;if(tile&&!tile.isIce&&prev&&tile.type===prev.type){run.push({col,row:r});}else{if(run.length>=3)groups.push([...run]);run=tile&&!tile.isIce?[{col,row:r}]:[];}}}
+    for(let col=0;col<C.COLS;col++){let run=[];for(let r=0;r<=C.ROWS;r++){const tile=this.at(col,r),prev=run.length?this.at(col,run[run.length-1].row):null;if(tile&&!tile.isIce&&prev&&tile.type===prev.type){run.push({col,row:r});}else{if(run.length>=3)groups.push([...run]);run=tile&&!tile.isIce?[{col,row:r}]:[];}}}
+    return groups;
+  }
+  markMatches(){const m=this._findMatches();m.forEach(({col,row})=>{const t=this.g[row][col];if(t)t.matched=true;});return m;}
+  removeMatched(){
+    let score=0,iceCleared=0;const cleared=[],powerSpawns=[];
+    if(this.level.power){this._findGroups().forEach(grp=>{if(grp.length>=4){const mid=grp[Math.floor(grp.length/2)];const t=this.at(mid.col,mid.row);if(t&&!t.isIce)powerSpawns.push({col:mid.col,row:mid.row,type:t.type});}});}
+    for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++){const t=this.g[r][col];if(t&&t.matched&&!t.isIce)this._hurtIce(col,r);}
+    for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++){const t=this.g[r][col];if(t&&t.matched){cleared.push({col,row:r,tile:t});this.g[r][col]=null;t.isIce?iceCleared++:score+=C.PTS;}}
+    powerSpawns.forEach(({col,row,type})=>{if(!this.g[row][col]){const pt=new Tile(7,col,row);pt.type=type;this.g[row][col]=pt;}});
+    return{score,iceCleared,cleared};
+  }
+  _hurtIce(col,r){[[0,-1],[0,1],[-1,0],[1,0]].forEach(([dc,dr])=>{const nb=this.at(col+dc,r+dr);if(nb&&nb.isIce){nb.iceHP--;if(nb.iceHP<=0)nb.matched=true;}});}
+  swap(c1,r1,c2,r2){const a=this.g[r1][c1],b=this.g[r2][c2];if(!a||!b||a.isIce||b.isIce)return false;this.g[r1][c1]=b;this.g[r2][c2]=a;a.setTarget(c2,r2);b.setTarget(c1,r1);return true;}
+  unswap(c1,r1,c2,r2){const a=this.g[r1][c1],b=this.g[r2][c2];this.g[r1][c1]=b;this.g[r2][c2]=a;if(a)a.setTarget(c2,r2);if(b)b.setTarget(c1,r1);}
+  applyGravity(){for(let col=0;col<C.COLS;col++){let empty=C.ROWS-1;for(let r=C.ROWS-1;r>=0;r--){if(this.g[r][col]){if(r!==empty){this.g[empty][col]=this.g[r][col];this.g[r][col]=null;this.g[empty][col].setTarget(col,empty);}empty--;}}}}
+  spawnNew(){for(let col=0;col<C.COLS;col++){let sy=-1;for(let r=0;r<C.ROWS;r++){if(!this.g[r][col]){const t=new Tile(this._ri(C.TYPES),col,sy);t.setTarget(col,r);this.g[r][col]=t;sy--;}}}}
+  detonatePower(col,r){const t=this.g[r][col];if(!t||!t.isPower)return[];this.g[r][col]=null;const hits=[];for(let c=0;c<C.COLS;c++){const tile=this.g[r][c];if(tile&&!tile.isPower){tile.matched=true;hits.push({col:c,row:r});}}for(let rr=0;rr<C.ROWS;rr++){const tile=this.g[rr][col];if(tile&&!tile.isPower){tile.matched=true;hits.push({col,row:rr});}}return hits;}
+  countIce(){let n=0;for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++)if(this.g[r][col]?.isIce)n++;return n;}
+  shuffle(){const types=[],positions=[];for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++){const t=this.g[r][col];if(t&&!t.isIce&&!t.isPower){types.push(t.type);positions.push([col,r]);}}for(let i=types.length-1;i>0;i--){const j=this._ri(i+1);[types[i],types[j]]=[types[j],types[i]];}positions.forEach(([col,r],i)=>{this.g[r][col].type=types[i];});}
+  update(dt){for(let r=0;r<C.ROWS;r++)for(let col=0;col<C.COLS;col++)this.g[r][col]?.update(dt);}
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ANIMS
+// ════════════════════════════════════════════════════════════════════
+class Anims {
+  constructor(){this.particles=[];this.texts=[];this.flash=0;}
+  burst(x,y,color,n=8){for(let i=0;i<n;i++){const a=Math.PI*2*i/n+Math.random()*0.4,s=2+Math.random()*3;this.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,size:3+Math.random()*3,color});}}
+  text(x,y,str,color='#f39c12'){this.texts.push({x,y,str,color,life:1,vy:-1.4});}
+  screenFlash(a=0.3){this.flash=a;}
+  update(dt){
+    this.particles=this.particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.14;p.life-=dt*2.2;p.alpha=Math.max(0,p.life);return p.life>0;});
+    this.texts=this.texts.filter(t=>{t.y+=t.vy;t.life-=dt*1.6;t.alpha=Math.max(0,t.life);return t.life>0;});
+    if(this.flash>0)this.flash-=dt*3.5;
+  }
+  render(ctx){
+    if(this.flash>0){ctx.save();ctx.globalAlpha=this.flash;ctx.fillStyle='#fff';ctx.fillRect(0,0,C.W,C.H);ctx.restore();}
+    this.particles.forEach(p=>{ctx.save();ctx.globalAlpha=p.alpha;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore();});
+    this.texts.forEach(t=>{ctx.save();ctx.globalAlpha=t.alpha;ctx.fillStyle=t.color;ctx.font='bold 22px "Segoe UI",sans-serif';ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=5;ctx.fillText(t.str,t.x,t.y);ctx.restore();});
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// AUDIO
+// ════════════════════════════════════════════════════════════════════
+class Audio {
+  constructor(){try{this.ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  _beep(freq,dur,wave='sine',vol=0.25){if(!this.ac)return;if(this.ac.state==='suspended')this.ac.resume();const o=this.ac.createOscillator(),g=this.ac.createGain();o.connect(g);g.connect(this.ac.destination);o.type=wave;o.frequency.value=freq;g.gain.setValueAtTime(vol,this.ac.currentTime);g.gain.exponentialRampToValueAtTime(0.001,this.ac.currentTime+dur);o.start();o.stop(this.ac.currentTime+dur);}
+  resume(){this.ac?.state==='suspended'&&this.ac.resume();}
+  swap()  {this._beep(380,0.06);}
+  bad()   {this._beep(140,0.18,'sawtooth',0.12);}
+  match() {this._beep(480,0.09);setTimeout(()=>this._beep(680,0.09),70);}
+  combo() {[440,560,700,900].forEach((f,i)=>setTimeout(()=>this._beep(f,0.14,'square',0.12),i*55));}
+  power() {[220,330,495,740,1050].forEach((f,i)=>setTimeout(()=>this._beep(f,0.18,'square',0.18),i*45));}
+  win()   {[523,659,784,1047].forEach((f,i)=>setTimeout(()=>this._beep(f,0.28,'sine',0.28),i*115));}
+  lose()  {[440,392,349,294].forEach((f,i)=>setTimeout(()=>this._beep(f,0.3,'sawtooth',0.18),i*140));}
+  shuffle(){this._beep(300,0.06);setTimeout(()=>this._beep(450,0.08),60);setTimeout(()=>this._beep(380,0.1),130);}
+  points(){[660,880].forEach((f,i)=>setTimeout(()=>this._beep(f,0.15,'sine',0.2),i*80));}
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDERER
+// ════════════════════════════════════════════════════════════════════
+class Renderer {
+  constructor(canvas){this.canvas=canvas;this.ctx=canvas.getContext('2d');canvas.width=C.W;canvas.height=C.H;}
+
+  clearBg(){
+    const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,C.H);
+    g.addColorStop(0,'#0a1628');g.addColorStop(1,'#0d1f3a');
+    ctx.fillStyle=g;ctx.fillRect(0,0,C.W,C.H);
+    ctx.save();
+    ctx.strokeStyle='rgba(93,173,226,0.06)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(C.W/2,C.H/2,90,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='rgba(231,76,60,0.07)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,C.H/2);ctx.lineTo(C.W,C.H/2);ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Team Select ────────────────────────────────────────────────────
+  drawTeamSelect(confTab, selectedId, hasExisting) {
+    const ctx=this.ctx, W=C.W, H=C.H;
+    this.clearBg();
+
+    // Header
+    ctx.save();
+    ctx.fillStyle='rgba(27,79,138,0.96)'; rrect(ctx,0,0,W,98,{bl:16,br:16}); ctx.fill();
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 20px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('🏒  CHOOSE YOUR TEAM',W/2,36);
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='12px "Segoe UI",sans-serif';
+    ctx.fillText('2025–26 NHL Season  ·  32 Teams',W/2,58);
+
+    // Conference tabs
+    const eActive=(confTab==='E');
+    ctx.fillStyle=eActive?C.CLR.BLUE2:'rgba(0,0,0,0.3)';
+    rrect(ctx,8,70,W/2-12,24,{tl:8,bl:8}); ctx.fill();
+    ctx.fillStyle=!eActive?C.CLR.BLUE2:'rgba(0,0,0,0.3)';
+    rrect(ctx,W/2+4,70,W/2-12,24,{tr:8,br:8}); ctx.fill();
+    ctx.fillStyle=eActive?C.CLR.WHITE:'rgba(255,255,255,0.45)';
+    ctx.font='bold 12px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('EASTERN CONFERENCE',W/4,87);
+    ctx.fillStyle=!eActive?C.CLR.WHITE:'rgba(255,255,255,0.45)';
+    ctx.fillText('WESTERN CONFERENCE',3*W/4,87);
+    ctx.restore();
+
+    const teams = getConfTeams(confTab);
+    const divName1 = confTab==='E'?'ATLANTIC DIVISION':'CENTRAL DIVISION';
+    const divName2 = confTab==='E'?'METROPOLITAN DIVISION':'PACIFIC DIVISION';
+
+    // Division headers + buttons
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='bold 9px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('— '+divName1+' —', W/2, 154);
+
+    teams.forEach((team,i)=>{
+      const {bx,by,bw,bh}=teamBtnPos(i);
+      if(i===8){
+        ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.fillRect(8,by-14,W-16,1);
+        ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='bold 9px "Segoe UI",sans-serif'; ctx.textAlign='center';
+        ctx.fillText('— '+divName2+' —', W/2, by-4);
+      }
+      const isSel = team.id===selectedId;
+      // Background
+      ctx.fillStyle=hexToRgba(team.c[0], isSel?0.85:0.38);
+      rrect(ctx,bx,by,bw,bh,8); ctx.fill();
+      if(isSel){
+        ctx.shadowColor=team.c[0]; ctx.shadowBlur=10;
+        ctx.strokeStyle=hexToRgba(team.c[1],0.9); ctx.lineWidth=2.5;
+        rrect(ctx,bx,by,bw,bh,8); ctx.stroke(); ctx.shadowBlur=0;
+      }
+      // Badge circle
+      ctx.fillStyle=hexToRgba(team.c[1],0.85);
+      ctx.beginPath(); ctx.arc(bx+22,by+bh/2,14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=hexToRgba(team.c[0],1);
+      ctx.font='bold 8px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(team.id,bx+22,by+bh/2); ctx.textBaseline='alphabetic';
+      // Name
+      ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.font='bold 12px "Segoe UI",sans-serif'; ctx.textAlign='left';
+      ctx.fillText(team.city,bx+44,by+bh/2-2);
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px "Segoe UI",sans-serif';
+      ctx.fillText(team.name,bx+44,by+bh/2+11);
+      // Checkmark
+      if(isSel){ ctx.fillStyle='#2ecc71'; ctx.font='bold 16px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillText('✓',bx+bw-8,by+bh/2); ctx.textBaseline='alphabetic'; }
+    });
+    ctx.restore();
+
+    // Confirm button
+    const tObj = teamById(selectedId);
+    const canConfirm = !!tObj;
+    ctx.save();
+    if(canConfirm){
+      const bg=tObj.c[0];
+      this._btn(ctx,W/2,584,`✓  ${tObj.city} ${tObj.name}`,bg,lighten(bg,28));
+    } else {
+      ctx.globalAlpha=0.35; this._btn(ctx,W/2,584,'SELECT A TEAM FIRST',C.CLR.BLUE,C.CLR.BLUE2); ctx.globalAlpha=1;
+    }
+    if(hasExisting){
+      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px "Segoe UI",sans-serif'; ctx.textAlign='center';
+      ctx.fillText('← Keep current team',W/2,622);
+    }
+    ctx.restore();
+  }
+
+  // ── HUD ─────────────────────────────────────────────────────────────
+  drawHUD(level, score, moves, gCur, gMax, availStars, isDaily, team) {
+    const ctx=this.ctx, W=C.W;
+    ctx.save();
+    ctx.fillStyle='rgba(27,79,138,0.92)'; rrect(ctx,0,0,W,152,{bl:16,br:16}); ctx.fill();
+    // Team color accent strip at top
+    if(team){ ctx.fillStyle=team.c[0]; rrect(ctx,0,0,W,4,{tl:0,tr:0}); ctx.fill(); }
+
+    ctx.strokeStyle='rgba(93,173,226,0.5)'; ctx.lineWidth=2.5;
+    this._stick(ctx,14,false); this._stick(ctx,W-14,true);
+
+    const lbl=isDaily?'📅 DAILY CHALLENGE':`LV${level.id}  ${level.name.toUpperCase()}`;
+    ctx.fillStyle=isDaily?'#b085f5':C.CLR.BLUE3;
+    ctx.font='bold 12px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.fillText(lbl,W/2,22);
+
+    ctx.fillStyle=C.CLR.GOLD; ctx.font='bold 38px "Segoe UI",sans-serif';
+    ctx.shadowColor='rgba(243,156,18,0.5)'; ctx.shadowBlur=10;
+    ctx.fillText(score.toLocaleString(),W/2,68); ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='11px "Segoe UI",sans-serif'; ctx.fillText('SCORE',W/2,82);
+
+    ctx.fillStyle=moves<=4?'#e74c3c':C.CLR.WHITE; ctx.font='bold 30px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(moves,50,68);
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='11px "Segoe UI",sans-serif'; ctx.fillText('MOVES',50,82);
+
+    const goalTxt=gCur>=gMax?'✓ DONE!':`${gCur.toLocaleString()}/${gMax.toLocaleString()}`;
+    ctx.fillStyle=gCur>=gMax?'#2ecc71':C.CLR.GOLD; ctx.font='bold 16px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(goalTxt,W-52,68);
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='11px "Segoe UI",sans-serif'; ctx.fillText('GOAL',W-52,82);
+
+    // Progress bar
+    const bx=18,by=94,bw=W-36,bh=8;
+    ctx.fillStyle='rgba(0,0,0,0.35)'; rrect(ctx,bx,by,bw,bh,5); ctx.fill();
+    const pct=Math.min(1,gCur/gMax);
+    if(pct>0){
+      const pg=ctx.createLinearGradient(bx,0,bx+bw*pct,0);
+      pg.addColorStop(0,'#2e86c1'); pg.addColorStop(1,'#f39c12');
+      ctx.fillStyle=pg; rrect(ctx,bx,by,bw*pct,bh,5); ctx.fill();
+    }
+
+    // Stars + team badge
+    ctx.fillStyle=availStars>0?C.CLR.GOLD:'rgba(255,255,255,0.3)';
+    ctx.font='bold 11px "Segoe UI",sans-serif'; ctx.textAlign='right';
+    ctx.fillText(`⭐ ${availStars}`,W-10,113);
+    if(team){
+      ctx.fillStyle=hexToRgba(team.c[0],0.9);
+      ctx.beginPath(); ctx.arc(18,109,8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=hexToRgba(team.c[1],0.95);
+      ctx.font='bold 6px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(team.id,18,109); ctx.textBaseline='alphabetic';
+    }
+
+    const mission = !isDaily && team ? getLevelTheme(level.id, team.id) : null;
+    ctx.fillStyle = mission ? 'rgba(255,215,60,0.9)' : 'rgba(255,255,255,0.42)';
+    ctx.font = mission ? 'italic 11px "Segoe UI",sans-serif' : '11px "Segoe UI",sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(mission || level.tip, W/2, 140);
+    ctx.restore();
+  }
+
+  _stick(ctx,x,flip){
+    ctx.save();ctx.translate(x,8);if(flip)ctx.scale(-1,1);
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,55);ctx.bezierCurveTo(0,70,14,76,20,76);ctx.lineTo(28,76);ctx.stroke();ctx.restore();
+  }
+
+  // ── Grid + tiles ────────────────────────────────────────────────────
+  drawGrid(){
+    const ctx=this.ctx,gw=C.COLS*C.TS,gh=C.ROWS*C.TS;
+    ctx.save();
+    ctx.fillStyle='rgba(214,234,248,0.05)'; rrect(ctx,C.OX-1,C.OY-1,gw+2,gh+2,6); ctx.fill();
+    ctx.strokeStyle=C.CLR.GRID; ctx.lineWidth=1;
+    for(let i=0;i<=C.COLS;i++){ctx.beginPath();ctx.moveTo(C.OX+i*C.TS,C.OY);ctx.lineTo(C.OX+i*C.TS,C.OY+gh);ctx.stroke();}
+    for(let i=0;i<=C.ROWS;i++){ctx.beginPath();ctx.moveTo(C.OX,C.OY+i*C.TS);ctx.lineTo(C.OX+gw,C.OY+i*C.TS);ctx.stroke();}
+    ctx.restore();
+  }
+
+  drawTile(tile,selected){
+    if(!tile)return;
+    const ctx=this.ctx,p=3,S=C.TS,x=tile.x+p,y=tile.y+p,w=S-p*2,h=S-p*2;
+    ctx.save(); ctx.globalAlpha=tile.alpha;
+    if(selected){
+      const sc=1+Math.sin(Date.now()/160)*0.04;
+      const cx=tile.x+S/2,cy=tile.y+S/2;
+      ctx.translate(cx,cy);ctx.scale(sc,sc);ctx.translate(-cx,-cy);
+    }
+    if(tile.isIce)       this._drawRef(ctx,x,y,w,h);
+    else if(tile.isPower)this._drawPower(ctx,x,y,w,h,tile);
+    else                 this._drawNormal(ctx,x,y,w,h,tile.type);
+    if(selected){
+      ctx.strokeStyle='#f39c12';ctx.lineWidth=3;rrect(ctx,x-2,y-2,w+4,h+4,9);ctx.stroke();
+      ctx.shadowColor='#f39c12';ctx.shadowBlur=14;ctx.strokeStyle='rgba(243,156,18,0.4)';ctx.lineWidth=1.5;rrect(ctx,x-5,y-5,w+10,h+10,11);ctx.stroke();ctx.shadowBlur=0;
+    }
+    ctx.restore();
+  }
+
+  _drawNormal(ctx,x,y,w,h,type){
+    const d=TILE_DEFS[type];
+    const g=ctx.createLinearGradient(x,y,x+w,y+h);
+    g.addColorStop(0,lighten(d.bg,45));g.addColorStop(1,d.bg);
+    ctx.fillStyle=g;rrect(ctx,x,y,w,h,8);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.12)';rrect(ctx,x+2,y+2,w-4,h*0.32,6);ctx.fill();
+    ctx.save();ctx.translate(x+w/2,y+h/2);this._icon(ctx,type,w*0.52);ctx.restore();
+    ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;rrect(ctx,x,y,w,h,8);ctx.stroke();
+  }
+
+  _icon(ctx,type,size){
+    const s=size/2;
+    ctx.fillStyle='rgba(255,255,255,0.92)';ctx.strokeStyle='rgba(255,255,255,0.92)';
+    switch(type){
+      case 0:ctx.beginPath();ctx.ellipse(0,2,s,s*0.45,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(0,0,0,0.25)';ctx.beginPath();ctx.ellipse(0,2,s*0.55,s*0.22,0,0,Math.PI*2);ctx.fill();break;
+      case 1:ctx.lineWidth=s*0.28;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-s*0.25,-s*0.85);ctx.lineTo(s*0.25,s*0.45);ctx.stroke();ctx.lineWidth=s*0.22;ctx.beginPath();ctx.moveTo(s*0.1,s*0.3);ctx.bezierCurveTo(s*0.45,s*0.55,s*0.7,s*0.9,s*0.45,s);ctx.stroke();break;
+      case 2:ctx.beginPath();ctx.arc(0,-s*0.05,s*0.72,Math.PI,0,false);ctx.lineTo(s*0.72,s*0.42);ctx.lineTo(-s*0.72,s*0.42);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(0,0,0,0.28)';ctx.beginPath();ctx.arc(0,-s*0.05,s*0.72,Math.PI*1.1,Math.PI*1.9,false);ctx.lineTo(s*0.48,s*0.18);ctx.lineTo(-s*0.48,s*0.18);ctx.closePath();ctx.fill();break;
+      case 3:ctx.lineWidth=s*0.22;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-s*0.48,-s*0.55);ctx.lineTo(-s*0.48,s*0.22);ctx.bezierCurveTo(-s*0.48,s*0.52,s*0.48,s*0.52,s*0.48,s*0.22);ctx.stroke();ctx.fillStyle='rgba(255,255,255,0.7)';ctx.fillRect(-s*0.6,s*0.52,s*1.4,s*0.14);break;
+      case 4:ctx.beginPath();ctx.arc(0,s*0.08,s*0.66,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,0.22)';ctx.beginPath();ctx.arc(-s*0.08,-s*0.32,s*0.28,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(s*0.22,-s*0.42,s*0.2,0,Math.PI*2);ctx.fill();break;
+      case 5:ctx.beginPath();ctx.moveTo(-s*0.68,-s*0.18);ctx.lineTo(-s*0.38,-s*0.78);ctx.lineTo(-s*0.14,-s*0.5);ctx.arc(0,-s*0.5,s*0.18,Math.PI,0,false);ctx.lineTo(s*0.38,-s*0.78);ctx.lineTo(s*0.68,-s*0.18);ctx.lineTo(s*0.52,s*0.78);ctx.lineTo(-s*0.52,s*0.78);ctx.closePath();ctx.fill();ctx.fillStyle=TILE_DEFS[5].bg;ctx.font=`bold ${s*0.68}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('99',0,s*0.2);break;
+    }
+  }
+
+  _drawRef(ctx,x,y,w,h){
+    // Striped background (clipped)
+    ctx.save();
+    ctx.beginPath(); rrect(ctx,x,y,w,h,6); ctx.clip();
+    ctx.fillStyle='#111'; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='rgba(238,238,238,0.88)';
+    const st=8;
+    for(let k=-2;k<10;k++){
+      const sx=x+k*st*2;
+      ctx.beginPath();ctx.moveTo(sx,y);ctx.lineTo(sx+st,y);ctx.lineTo(sx+st+h,y+h);ctx.lineTo(sx+h,y+h);ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+    // Head
+    ctx.fillStyle='#e8b89a';
+    ctx.beginPath();ctx.arc(x+w/2,y+h*0.28,w*0.18,0,Math.PI*2);ctx.fill();
+    // Whistle cord
+    ctx.strokeStyle='#f5c842';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x+w*0.46,y+h*0.56);ctx.lineTo(x+w*0.6,y+h*0.62);ctx.stroke();
+    // Whistle body
+    ctx.strokeStyle='#f5c842';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(x+w*0.64,y+h*0.65,w*0.1,0,Math.PI*2);ctx.stroke();
+    // Border
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=2;rrect(ctx,x,y,w,h,6);ctx.stroke();
+  }
+
+  _drawPower(ctx,x,y,w,h,tile){
+    const sh=Math.sin(tile.pulse)*0.5+0.5;
+    ctx.shadowColor='#f39c12';ctx.shadowBlur=14+sh*10;
+    const g=ctx.createRadialGradient(x+w/2,y+h/2,2,x+w/2,y+h/2,w/2);
+    g.addColorStop(0,'#fce770');g.addColorStop(0.5,'#f39c12');g.addColorStop(1,'#e67e22');
+    ctx.fillStyle=g;rrect(ctx,x,y,w,h,8);ctx.fill();ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.95)';ctx.font=`bold ${w*0.56}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('⚡',x+w/2,y+h/2+1);
+    ctx.strokeStyle=`rgba(255,255,255,${sh*0.55})`;ctx.lineWidth=2;rrect(ctx,x+2,y+2,w-4,h-4,6);ctx.stroke();
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────
+  drawFooter(level, availStars, canShuffle){
+    const ctx=this.ctx, W=C.W, fy=C.OY+C.ROWS*C.TS+6, fh=52;
+    ctx.save();
+    ctx.fillStyle='rgba(27,79,138,0.78)'; rrect(ctx,8,fy,W-16,fh,12); ctx.fill();
+    ctx.fillStyle=canShuffle?C.CLR.GOLD:'rgba(255,255,255,0.25)';
+    ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('🔀 SHUFFLE',72,fy+20);
+    ctx.fillStyle=canShuffle?'rgba(243,156,18,0.7)':'rgba(255,255,255,0.2)';
+    ctx.font='11px "Segoe UI",sans-serif'; ctx.fillText(`costs ${C.BOOSTER_SHUFFLE}★`,72,fy+35);
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(138,fy+8);ctx.lineTo(138,fy+fh-8);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.55)';ctx.font='11px "Segoe UI",sans-serif';ctx.textAlign='center';
+    ctx.fillText(level.tip,W/2+15,fy+fh/2+4);
+    ctx.fillStyle=availStars>0?C.CLR.GOLD:'rgba(255,255,255,0.3)';
+    ctx.font='bold 15px "Segoe UI",sans-serif';ctx.textAlign='center';
+    ctx.fillText(`⭐ ${availStars}`,W-38,fy+fh/2+5);
+    ctx.restore();
+  }
+
+  // ── Menu ─────────────────────────────────────────────────────────────
+  drawMenu(meta){
+    const ctx=this.ctx, W=C.W, H=C.H;
+    this.clearBg();
+    ctx.save();
+    ctx.fillStyle='rgba(27,79,138,0.94)'; rrect(ctx,28,H*0.13,W-56,130,18); ctx.fill();
+    ctx.strokeStyle='rgba(93,173,226,0.65)';ctx.lineWidth=2; rrect(ctx,28,H*0.13,W-56,130,18); ctx.stroke();
+    ctx.fillStyle=C.CLR.BLUE3; ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('⬡  SLAPSHOT SAGA  ⬡',W/2,H*0.13+30);
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 46px "Segoe UI",sans-serif';
+    ctx.shadowColor='rgba(93,173,226,0.7)'; ctx.shadowBlur=16;
+    ctx.fillText('HOCKEY',W/2,H*0.13+82); ctx.fillText('MATCH-3',W/2,H*0.13+124); ctx.shadowBlur=0;
+    ctx.restore();
+    this._btn(ctx,W/2,H*0.55,'🏒  PLAY — SEASON MAP','#1b4f8a','#2e86c1');
+    this._btn(ctx,W/2,H*0.55+68,'📅  DAILY CHALLENGE','#4a2090','#7b44cc');
+    // Team button
+    const team = teamById(meta.teamId);
+    if(team){
+      ctx.save();
+      ctx.fillStyle=hexToRgba(team.c[0],0.85); rrect(ctx,W/2-127,H*0.55+136,254,44,12); ctx.fill();
+      ctx.strokeStyle=hexToRgba(team.c[1],0.6); ctx.lineWidth=1.5; rrect(ctx,W/2-127,H*0.55+136,254,44,12); ctx.stroke();
+      ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 14px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(`🏒 ${team.full}`,W/2,H*0.55+158); ctx.textBaseline='alphabetic';
+      ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='10px "Segoe UI",sans-serif';
+      ctx.fillText('Tap to change team',W/2,H*0.55+172);
+      ctx.restore();
+    } else {
+      this._btn(ctx,W/2,H*0.55+136,'🏒  CHOOSE YOUR TEAM','#4a2090','#7b44cc');
+    }
+    ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.font='11px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Match 3+ · 4+ creates ⚡ Power Pucks · chase refs 🧑‍⚖️ off the ice',W/2,H-22);
+  }
+
+  // ── Season Map ───────────────────────────────────────────────────────
+  drawSeasonMap(meta, chIdx, teamInfo){
+    const ctx=this.ctx, W=C.W, H=C.H;
+    this.clearBg();
+    const ch=CHAPTERS[chIdx];
+
+    // Title
+    ctx.save();
+    ctx.fillStyle='rgba(27,79,138,0.95)'; rrect(ctx,0,0,W,58,{bl:16,br:16}); ctx.fill();
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 17px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('🏒  ROAD TO THE STANLEY CUP  🏆',W/2,35); ctx.restore();
+
+    // Chapter nav
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.3)'; rrect(ctx,10,66,W-20,50,12); ctx.fill();
+    ctx.fillStyle=chIdx===0?'rgba(255,255,255,0.18)':'rgba(255,255,255,0.8)';
+    ctx.font='bold 20px sans-serif'; ctx.textAlign='center'; ctx.fillText('◀',40,96);
+    ctx.fillStyle=ch.color; ctx.font='bold 21px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.shadowColor=ch.color; ctx.shadowBlur=10;
+    ctx.fillText(`${ch.emoji}  ${ch.name.toUpperCase()}`,W/2,96); ctx.shadowBlur=0;
+    ctx.fillStyle=chIdx===CHAPTERS.length-1?'rgba(255,255,255,0.18)':'rgba(255,255,255,0.8)';
+    ctx.fillText('▶',W-40,96); ctx.restore();
+
+    const nodes=ch.nodes, lvIds=nodes.map((_,i)=>ch.lvStart+i);
+    const chStars=lvIds.reduce((s,id)=>s+(meta.stars[id]||0),0);
+    const maxChStars=(ch.lvEnd-ch.lvStart+1)*3;
+    ctx.save(); ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='12px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`Levels ${ch.lvStart}–${ch.lvEnd}  ·  ★ ${chStars} / ${maxChStars}`,W/2,130); ctx.restore();
+
+    // Connecting lines
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=2.5; ctx.setLineDash([6,6]);
+    for(let i=0;i<nodes.length-1;i++){ctx.beginPath();ctx.moveTo(nodes[i].x,nodes[i].y);ctx.lineTo(nodes[i+1].x,nodes[i+1].y);ctx.stroke();}
+    ctx.setLineDash([]); ctx.restore();
+
+    // Level nodes
+    lvIds.forEach((lvId,i)=>{
+      const stars=meta.stars[lvId]||0;
+      const unlocked=meta.unlocked>=lvId;
+      this._mapNode(ctx,nodes[i].x,nodes[i].y,lvId,stars,unlocked,ch.color);
+    });
+    ctx.save(); ctx.textAlign='center';
+    lvIds.forEach((lvId,i)=>{
+      if(meta.unlocked<lvId)return;
+      const lv=LEVELS[lvId-1];
+      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px "Segoe UI",sans-serif';
+      ctx.fillText(goalLabel(lv),nodes[i].x,nodes[i].y+MAP_R+28);
+      const th=getLevelTheme(lvId,meta.teamId);
+      if(th){
+        ctx.fillStyle='rgba(255,215,60,0.75)'; ctx.font='italic 9px "Segoe UI",sans-serif';
+        ctx.fillText(th,nodes[i].x,nodes[i].y+MAP_R+42,160);
+      }
+    }); ctx.restore();
+
+    // Daily challenge button
+    const today=todayStr(), hasBest=meta.dailyBest?.date===today;
+    ctx.save();
+    const dg=ctx.createLinearGradient(55,378,W-55,422); dg.addColorStop(0,'#4a2090'); dg.addColorStop(1,'#7b44cc');
+    ctx.fillStyle=dg; rrect(ctx,55,378,W-110,44,13); ctx.fill();
+    ctx.strokeStyle='rgba(150,100,255,0.5)'; ctx.lineWidth=2; rrect(ctx,55,378,W-110,44,13); ctx.stroke();
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`📅  DAILY CHALLENGE  —  ${today}`,W/2,397);
+    if(hasBest){ ctx.fillStyle=C.CLR.GOLD; ctx.font='11px "Segoe UI",sans-serif'; ctx.fillText(`Today's best: ${meta.dailyBest.score.toLocaleString()}`,W/2,413); }
+    ctx.restore();
+
+    // Back button
+    this._btn(ctx,W/2,462,'← BACK TO MENU',C.CLR.BLUE,C.CLR.BLUE2);
+
+    // Team standing strip
+    if(teamInfo){
+      ctx.save();
+      const team=teamInfo.team;
+      ctx.fillStyle=hexToRgba(team.c[0],0.18); rrect(ctx,8,494,W-16,84,10); ctx.fill();
+      ctx.strokeStyle=hexToRgba(team.c[0],0.4); ctx.lineWidth=1.5; rrect(ctx,8,494,W-16,84,10); ctx.stroke();
+
+      // Team badge
+      ctx.fillStyle=hexToRgba(team.c[0],0.9); ctx.beginPath(); ctx.arc(34,520,14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=hexToRgba(team.c[1],0.95); ctx.font='bold 8px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(team.id,34,520); ctx.textBaseline='alphabetic';
+
+      ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 14px "Segoe UI",sans-serif'; ctx.textAlign='left';
+      ctx.fillText(team.full,56,516);
+      ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='11px "Segoe UI",sans-serif';
+      ctx.fillText(`${teamInfo.pts} pts  ·  ${teamInfo.ptsToMax} pts possible  ·  Rank #${teamInfo.rank} of 32`,56,532);
+
+      // Playoff status bar
+      const pct=Math.min(1,teamInfo.rank<=16?1:(32-teamInfo.rank)/16);
+      const barX=14, barY=546, barW=W-28, barH=8;
+      ctx.fillStyle='rgba(0,0,0,0.3)'; rrect(ctx,barX,barY,barW,barH,4); ctx.fill();
+      const bg=teamInfo.rank<=16?'#2ecc71':'#e67e22';
+      ctx.fillStyle=bg; rrect(ctx,barX,barY,barW*Math.min(1,teamInfo.pts/Math.max(1,teamInfo.ptsToMax)),barH,4); ctx.fill();
+      // Playoff line marker at 50% (16/32 teams)
+      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(barX+barW*0.5,barY-3); ctx.lineTo(barX+barW*0.5,barY+barH+3); ctx.stroke();
+
+      const statusTxt = teamInfo.rank<=1 ? '🏆 LEAGUE LEADERS!'
+        : teamInfo.rank<=8  ? `✓ PLAYOFF SPOT — #${teamInfo.rank} in League`
+        : teamInfo.rank<=16 ? `✓ WILD CARD — #${teamInfo.rank} in League`
+        : `#${teamInfo.rank} — ${teamInfo.rank-16} spots outside playoffs`;
+      ctx.fillStyle=teamInfo.rank<=16?'#2ecc71':'rgba(255,255,255,0.55)';
+      ctx.font='bold 11px "Segoe UI",sans-serif'; ctx.textAlign='center';
+      ctx.fillText(statusTxt,W/2,570);
+      ctx.restore();
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px "Segoe UI",sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Choose your team from the menu to track standings',W/2,510);
+    }
+
+    // Stars
+    const total=Object.values(meta.stars).reduce((a,b)=>a+b,0);
+    const avail=Math.max(0,total-(meta.spent||0));
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='11px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`⭐ ${avail} stars available`,W/2,594);
+  }
+
+  _mapNode(ctx,x,y,lvId,stars,unlocked,chColor){
+    const r=MAP_R; ctx.save();
+    if(!unlocked){
+      ctx.globalAlpha=0.42;
+      ctx.fillStyle='#1a2540'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='bold 18px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🔒',x,y);
+    } else {
+      const done=stars>0;
+      ctx.fillStyle=done?chColor:C.CLR.BLUE; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      if(done){ctx.shadowColor=chColor;ctx.shadowBlur=14;}
+      ctx.strokeStyle=done?C.CLR.GOLD:'rgba(93,173,226,0.6)'; ctx.lineWidth=done?3:2;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
+      ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 18px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(lvId,x,y);
+      for(let s=0;s<3;s++){ctx.fillStyle=s<stars?C.CLR.GOLD:'rgba(255,255,255,0.2)';ctx.font='12px sans-serif';ctx.textBaseline='alphabetic';ctx.fillText('★',x-12+s*12,y+r+14);}
+    }
+    ctx.restore();
+  }
+
+  // ── WIN screen ──────────────────────────────────────────────────────
+  drawWin(level, score, stars, isDaily, team, ptsGained, rank){
+    const ctx=this.ctx, W=C.W, H=C.H;
+    const hasTeamInfo = !isDaily && team;
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.72)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#1b4f8a'; rrect(ctx,38,H*0.15,W-76,H*0.72,22); ctx.fill();
+    ctx.strokeStyle=C.CLR.GOLD; ctx.lineWidth=3; rrect(ctx,38,H*0.15,W-76,H*0.72,22); ctx.stroke();
+
+    ctx.fillStyle=C.CLR.GOLD; ctx.font='bold 34px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.shadowColor='rgba(243,156,18,0.8)'; ctx.shadowBlur=18;
+    ctx.fillText(isDaily?'DAILY DONE! 📅':'GOAL! 🏒',W/2,H*0.15+52); ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='14px "Segoe UI",sans-serif'; ctx.fillText('Final Score',W/2,H*0.15+84);
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 46px "Segoe UI",sans-serif'; ctx.fillText(score.toLocaleString(),W/2,H*0.15+132);
+    for(let s=0;s<3;s++){ctx.fillStyle=s<stars?C.CLR.GOLD:'rgba(255,255,255,0.18)';ctx.font=`${s<stars?52:42}px sans-serif`;ctx.fillText('★',W/2-58+s*58,H*0.15+188);}
+
+    // Mission completed banner
+    let mOff=0;
+    if(!isDaily && team){
+      const th=getLevelTheme(level.id,team.id);
+      if(th){
+        ctx.fillStyle='rgba(255,215,60,0.85)'; ctx.font='italic 11px "Segoe UI",sans-serif'; ctx.textAlign='center';
+        ctx.fillText('🏒 '+th, W/2, H*0.15+207, W-100);
+        mOff=22;
+      }
+    }
+
+    // Team points notification
+    let yOff=mOff;
+    if(hasTeamInfo){
+      if(ptsGained>0){
+        ctx.fillStyle=hexToRgba(team.c[0],0.25); rrect(ctx,48,H*0.15+202+mOff,W-96,44,8); ctx.fill();
+        ctx.strokeStyle=hexToRgba(team.c[0],0.6); ctx.lineWidth=1; rrect(ctx,48,H*0.15+202+mOff,W-96,44,8); ctx.stroke();
+        ctx.fillStyle=team.c[0]; ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+        ctx.fillText(`🏒 +${ptsGained} POINTS for ${team.full}`,W/2,H*0.15+222+mOff);
+        const inPO=rank<=16;
+        const rTxt=rank===1?'#1 — League Leaders! 🏆':rank<=8?`#${rank} — PLAYOFF SPOT ✓`:rank<=16?`#${rank} — Wild Card ✓`:`#${rank} — ${rank-16} spots outside playoffs`;
+        ctx.fillStyle=inPO?'#2ecc71':'rgba(255,255,255,0.55)'; ctx.font='bold 11px "Segoe UI",sans-serif';
+        ctx.fillText(rTxt,W/2,H*0.15+238+mOff); yOff=mOff+52;
+      } else if(rank>0){
+        const inPO=rank<=16;
+        const rTxt=rank<=16?`🏒 ${team.id} — #${rank} — PLAYOFF SPOT ✓`:`🏒 ${team.id} — Rank #${rank}`;
+        ctx.fillStyle=inPO?'#2ecc71':'rgba(255,255,255,0.4)'; ctx.font='bold 11px "Segoe UI",sans-serif'; ctx.textAlign='center';
+        ctx.fillText(rTxt,W/2,H*0.15+212+mOff); yOff=mOff+28;
+      }
+    }
+
+    const y1=H*0.15+256+yOff, y2=H*0.15+314+yOff;
+    if(isDaily){
+      this._btn(ctx,W/2,y1,'✓  DONE',C.CLR.GREEN,'#2ecc71');
+      this._btn(ctx,W/2,y2,'LEVEL MAP',C.CLR.BLUE,C.CLR.BLUE2);
+    } else {
+      this._btn(ctx,W/2,y1,'NEXT LEVEL  ▶',C.CLR.GREEN,'#2ecc71');
+      this._btn(ctx,W/2,y2,'LEVEL MAP',C.CLR.BLUE,C.CLR.BLUE2);
+    }
+    ctx.restore();
+  }
+
+  // ── LOSE screen ──────────────────────────────────────────────────────
+  drawLose(score, availStars, isDaily){
+    const ctx=this.ctx, W=C.W, H=C.H;
+    const showCont=!isDaily&&availStars>=C.BOOSTER_CONTINUE;
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#1b2a42'; rrect(ctx,38,H*0.22,W-76,showCont?H*0.57:H*0.5,22); ctx.fill();
+    ctx.strokeStyle='#e74c3c'; ctx.lineWidth=3; rrect(ctx,38,H*0.22,W-76,showCont?H*0.57:H*0.5,22); ctx.stroke();
+    ctx.fillStyle='#e74c3c'; ctx.font='bold 27px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('NO MORE MOVES!',W/2,H*0.22+52);
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='14px "Segoe UI",sans-serif'; ctx.fillText('Final Score',W/2,H*0.22+88);
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 44px "Segoe UI",sans-serif'; ctx.fillText(score.toLocaleString(),W/2,H*0.22+138);
+    if(showCont){
+      this._btn(ctx,W/2,H*0.22+196,`▶  CONTINUE  (+5 moves · ${C.BOOSTER_CONTINUE}★)`,'#e67e22','#f39c12');
+      this._btn(ctx,W/2,H*0.22+264,'↺  TRY AGAIN','#e74c3c','#e57373');
+      this._btn(ctx,W/2,H*0.22+332,'LEVEL MAP',C.CLR.BLUE,C.CLR.BLUE2);
+    } else {
+      this._btn(ctx,W/2,H*0.22+196,'↺  TRY AGAIN','#e74c3c','#e57373');
+      this._btn(ctx,W/2,H*0.22+264,'LEVEL MAP',C.CLR.BLUE,C.CLR.BLUE2);
+    }
+    ctx.restore();
+  }
+
+  _btn(ctx,cx,cy,label,c1,c2){
+    const bw=254,bh=50; ctx.save();
+    const g=ctx.createLinearGradient(cx-bw/2,cy-bh/2,cx+bw/2,cy+bh/2);
+    g.addColorStop(0,c2); g.addColorStop(1,c1);
+    ctx.fillStyle=g; rrect(ctx,cx-bw/2,cy-bh/2,bw,bh,13); ctx.fill();
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 15px "Segoe UI",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(label,cx,cy); ctx.restore();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// GAME
+// ════════════════════════════════════════════════════════════════════
+const S={MENU:'menu',MAP:'map',PLAY:'play',WAIT:'wait',WIN:'win',LOSE:'lose',TEAM_SELECT:'team_select'};
+
+class Game {
+  constructor(canvas){
+    this.r=new Renderer(canvas); this.sfx=new Audio(); this.fx=new Anims();
+    this.board=null; this.state=S.MENU;
+    this.lvIdx=0; this.isDaily=false;
+    this.score=0; this.moves=0; this.combo=0; this.iceDone=0;
+    this.sel=null; this.winStars=0; this.mapChapter=0;
+    this.confTab='E'; this.tempTeam=null; this.selectFrom=S.MENU;
+    this.winTeamPts=0; this.winTeamRank=0;
+    this.meta={unlocked:1,stars:{},spent:0,dailyBest:null,teamId:null,teamPts:0,levelClears:[]};
+    this._load();
+    // First launch → choose team
+    if(!this.meta.teamId) this.state=S.TEAM_SELECT;
+    canvas.addEventListener('click',e=>this._click(e));
+    requestAnimationFrame(t=>this._loop(t,t));
+  }
+
+  _load(){ try{ const s=localStorage.getItem('ss3_meta'); if(s){ const m=JSON.parse(s); this.meta={...this.meta,...m}; }} catch(_){} }
+  _save(){ try{ localStorage.setItem('ss3_meta',JSON.stringify(this.meta)); } catch(_){} }
+
+  _availStars(){ return Math.max(0,Object.values(this.meta.stars).reduce((a,b)=>a+b,0)-(this.meta.spent||0)); }
+
+  get _lvDef(){ return this.isDaily?DAILY_LEVEL:LEVELS[this.lvIdx]; }
+
+  _rivalPts(teamId, maxPts){
+    let h=0; for(const c of teamId) h=(h*31+c.charCodeAt(0))&0xFFFF;
+    return Math.round(((h%900)/1000+0.05)*maxPts);
+  }
+
+  _getStandings(){
+    const maxPts=Math.max(3,(this.meta.unlocked||1)*3);
+    const playerPts=this.meta.teamPts||0;
+    const rows=NHL_TEAMS.map(t=>({team:t, pts:t.id===this.meta.teamId?playerPts:this._rivalPts(t.id,maxPts), isPlayer:t.id===this.meta.teamId}));
+    rows.sort((a,b)=>b.pts-a.pts||a.team.name.localeCompare(b.team.name));
+    return rows.map((r,i)=>({...r,rank:i+1}));
+  }
+
+  _teamInfo(){
+    if(!this.meta.teamId) return null;
+    const team=teamById(this.meta.teamId);
+    const standings=this._getStandings();
+    const row=standings.find(r=>r.isPlayer);
+    const maxPts=(this.meta.unlocked||1)*3;
+    return { team, rank:row?.rank||0, pts:this.meta.teamPts||0, inPlayoffs:(row?.rank||0)<=16, ptsToMax:maxPts };
+  }
+
+  startLevel(idx, daily=false){
+    this.lvIdx=idx; this.isDaily=daily;
+    const lv=this._lvDef;
+    const rng=daily?mkRng(dailySeed()):null;
+    this.board=new Board(lv,rng);
+    this.score=0; this.moves=lv.moves; this.combo=0; this.iceDone=0;
+    this.sel=null; this.winTeamPts=0; this.winTeamRank=0;
+    this.state=S.PLAY;
+  }
+
+  _click(e){
+    this.sfx.resume();
+    const rc=this.r.canvas.getBoundingClientRect();
+    const mx=(e.clientX-rc.left)*(C.W/rc.width);
+    const my=(e.clientY-rc.top)*(C.H/rc.height);
+    switch(this.state){
+      case S.MENU:       this._menuClick(mx,my); return;
+      case S.MAP:        this._mapClick(mx,my);  return;
+      case S.WIN:        this._winClick(mx,my);  return;
+      case S.LOSE:       this._loseClick(mx,my); return;
+      case S.TEAM_SELECT:this._teamSelectClick(mx,my); return;
+    }
+    if(this.state!==S.PLAY) return;
+
+    const fy=C.OY+C.ROWS*C.TS+6;
+    if(my>=fy&&mx<=145){ this._doShuffle(); return; }
+
+    const col=Math.floor((mx-C.OX)/C.TS), row=Math.floor((my-C.OY)/C.TS);
+    if(col<0||col>=C.COLS||row<0||row>=C.ROWS){ this.sel=null; return; }
+    const tile=this.board.at(col,row);
+    if(!tile||tile.isIce){ this.sel=null; return; }
+
+    if(!this.sel){ this.sel={col,row}; this.sfx.swap(); return; }
+    const{col:sc,row:sr}=this.sel;
+    if(sc===col&&sr===row){ this.sel=null; return; }
+    if(Math.abs(sc-col)+Math.abs(sr-row)!==1){ this.sel={col,row}; return; }
+    if(tile.isPower){ this._detonate(col,row); this.sel=null; return; }
+    if(this.board.at(sc,sr)?.isPower){ this._detonate(sc,sr); this.sel=null; return; }
+
+    this.board.swap(sc,sr,col,row); this.sel=null; this.state=S.WAIT;
+    setTimeout(()=>{
+      const hits=this.board.markMatches();
+      if(!hits.length){ this.board.unswap(sc,sr,col,row); this.sfx.bad(); setTimeout(()=>{ this.state=S.PLAY; },230); }
+      else{ this.moves--; this.combo=0; this._resolve(); }
+    },200);
+  }
+
+  _detonate(col,row){
+    this.sfx.power(); this.fx.screenFlash(0.45);
+    const hits=this.board.detonatePower(col,row);
+    this.score+=hits.length*80;
+    hits.forEach(({col:hc,row:hr})=>this.fx.burst(C.OX+hc*C.TS+C.TS/2,C.OY+hr*C.TS+C.TS/2,'#f39c12',5));
+    this.fx.text(C.W/2,C.OY+C.ROWS*C.TS/2,'POWER PLAY! ⚡','#f39c12');
+    this.moves--; this.state=S.WAIT;
+    setTimeout(()=>this._resolve(),280);
+  }
+
+  _doShuffle(){
+    if(this.state!==S.PLAY)return;
+    const avail=this._availStars();
+    if(avail<C.BOOSTER_SHUFFLE){ this.fx.text(C.W/2,C.H/2,`Need ${C.BOOSTER_SHUFFLE}★ to shuffle!`,'#e74c3c'); return; }
+    this.meta.spent=(this.meta.spent||0)+C.BOOSTER_SHUFFLE; this._save();
+    this.board.shuffle(); this.sfx.shuffle(); this.fx.screenFlash(0.18);
+    this.fx.text(C.W/2,C.OY+36,'Board Shuffled! 🔀','#5dade2');
+  }
+
+  _doContinue(){
+    const avail=this._availStars();
+    if(avail<C.BOOSTER_CONTINUE){ this.fx.text(C.W/2,C.H/2,`Need ${C.BOOSTER_CONTINUE}★!`,'#e74c3c'); return; }
+    this.meta.spent=(this.meta.spent||0)+C.BOOSTER_CONTINUE; this._save();
+    this.moves+=5; this.state=S.PLAY;
+    this.sfx.win(); this.fx.text(C.W/2,C.OY+36,'+5 MOVES! ⚡','#f39c12');
+  }
+
+  _resolve(){
+    let hasMarked=false;
+    outer: for(let r=0;r<C.ROWS;r++) for(let col=0;col<C.COLS;col++) if(this.board.g[r][col]?.matched){hasMarked=true;break outer;}
+    if(!hasMarked){ this._checkEnd(); return; }
+    this.combo++; this.sfx.match();
+    if(this.combo>1){ this.sfx.combo(); this.fx.screenFlash(0.14); this.fx.text(C.W/2,C.OY+C.ROWS*C.TS/2-20,`${this.combo}x COMBO!`,'#e74c3c'); }
+    const{score,iceCleared,cleared}=this.board.removeMatched();
+    const mult=1+(this.combo-1)*0.5, gained=Math.floor(score*mult);
+    this.score+=gained; this.iceDone+=iceCleared;
+    cleared.forEach(({col,row,tile})=>{
+      const px=C.OX+col*C.TS+C.TS/2, py=C.OY+row*C.TS+C.TS/2;
+      this.fx.burst(px,py,tile.isIce?'#dddddd':TILE_DEFS[tile.type%6].hi,6);
+    });
+    if(gained>0) this.fx.text(C.W/2,C.OY+30,`+${gained}`,mult>1?'#e74c3c':'#f39c12');
+    this.board.applyGravity(); this.board.spawnNew();
+    setTimeout(()=>{ const c=this.board.markMatches(); if(c.length){this._resolve();}else{this.combo=0;this._checkEnd();} },480);
+  }
+
+  _checkEnd(){
+    const lv=this._lvDef;
+    const won=lv.goal.type==='score'?this.score>=lv.goal.target:this.iceDone>=lv.goal.target||this.board.countIce()===0;
+    if(won){
+      const stars=this._calcStars(); this.winStars=stars;
+      if(!this.isDaily){
+        const id=lv.id;
+        if((this.meta.stars[id]||0)<stars) this.meta.stars[id]=stars;
+        const next=this.lvIdx+1;
+        if(next<LEVELS.length) this.meta.unlocked=Math.max(this.meta.unlocked,LEVELS[next].id);
+        // Award 3 team pts on first-ever clear of this level
+        const cleared=new Set(this.meta.levelClears||[]);
+        if(!cleared.has(id)){
+          cleared.add(id);
+          this.meta.levelClears=[...cleared];
+          this.meta.teamPts=(this.meta.teamPts||0)+3;
+          this.winTeamPts=3;
+          this.sfx.points();
+        } else { this.winTeamPts=0; }
+        const standings=this._getStandings();
+        this.winTeamRank=(standings.find(r=>r.isPlayer)?.rank)||0;
+      } else {
+        const today=todayStr();
+        if(!this.meta.dailyBest||this.meta.dailyBest.date!==today||this.score>this.meta.dailyBest.score)
+          this.meta.dailyBest={date:today,score:this.score};
+        this.winTeamPts=0; this.winTeamRank=0;
+      }
+      this._save(); this.sfx.win(); this.fx.screenFlash(0.5); this.state=S.WIN;
+    } else if(this.moves<=0){
+      this.sfx.lose(); this.state=S.LOSE;
+    } else { this.state=S.PLAY; }
+  }
+
+  _calcStars(){ const p=this.moves/this._lvDef.moves; return p>=0.4?3:p>=0.2?2:1; }
+  _hit(mx,my,cx,cy,hw=127,hh=25){ return Math.abs(mx-cx)<hw&&Math.abs(my-cy)<hh; }
+
+  _menuClick(mx,my){
+    const W=C.W, H=C.H;
+    if(this._hit(mx,my,W/2,H*0.55)){this.state=S.MAP;return;}
+    if(this._hit(mx,my,W/2,H*0.55+68)){this.startLevel(0,true);return;}
+    // Team button (change / choose)
+    if(this._hit(mx,my,W/2,H*0.55+158,127,30)){
+      this.selectFrom=S.MENU; this.tempTeam=this.meta.teamId; this.state=S.TEAM_SELECT;
+    }
+  }
+
+  _mapClick(mx,my){
+    const W=C.W, ch=CHAPTERS[this.mapChapter];
+    if(this._hit(mx,my,40,91,38,28)&&this.mapChapter>0){this.mapChapter--;return;}
+    if(this._hit(mx,my,W-40,91,38,28)&&this.mapChapter<CHAPTERS.length-1){this.mapChapter++;return;}
+    const nodes=ch.nodes, lvIds=nodes.map((_,i)=>ch.lvStart+i);
+    for(let i=0;i<nodes.length;i++){
+      const{x,y}=nodes[i], lvId=lvIds[i];
+      if(this.meta.unlocked>=lvId&&Math.hypot(mx-x,my-y)<=MAP_R+8){this.startLevel(lvId-1,false);return;}
+    }
+    if(this._hit(mx,my,W/2,400,W/2-55,28)){this.startLevel(0,true);return;}
+    if(this._hit(mx,my,W/2,462)){this.state=S.MENU;}
+  }
+
+  _winClick(mx,my){
+    const W=C.W, H=C.H;
+    const mOff=(!this.isDaily&&this.meta.teamId&&getLevelTheme(this._lvDef.id,this.meta.teamId))?22:0;
+    const yOff=mOff+(this.winTeamPts>0?52:this.winTeamRank>0?28:0);
+    const cy1=H*0.15+256+yOff, cy2=H*0.15+314+yOff;
+    if(this._hit(mx,my,W/2,cy1)){
+      if(this.isDaily){this.state=S.MAP;return;}
+      const next=this.lvIdx+1;
+      if(next<LEVELS.length){
+        const nextCh=CHAPTERS.findIndex(c=>LEVELS[next].id>=c.lvStart&&LEVELS[next].id<=c.lvEnd);
+        if(nextCh>=0)this.mapChapter=nextCh;
+        this.startLevel(next,false);
+      } else { this.state=S.MAP; }
+      return;
+    }
+    if(this._hit(mx,my,W/2,cy2)){this.state=S.MAP;}
+  }
+
+  _loseClick(mx,my){
+    const W=C.W, H=C.H, avail=this._availStars(), showCont=!this.isDaily&&avail>=C.BOOSTER_CONTINUE;
+    if(showCont){
+      if(this._hit(mx,my,W/2,H*0.22+196)){this._doContinue();return;}
+      if(this._hit(mx,my,W/2,H*0.22+264)){this.startLevel(this.lvIdx,false);return;}
+      if(this._hit(mx,my,W/2,H*0.22+332)){this.state=S.MAP;}
+    } else {
+      if(this._hit(mx,my,W/2,H*0.22+196)){this.isDaily?this.startLevel(0,true):this.startLevel(this.lvIdx,false);return;}
+      if(this._hit(mx,my,W/2,H*0.22+264)){this.state=S.MAP;}
+    }
+  }
+
+  _teamSelectClick(mx,my){
+    const W=C.W, H=C.H;
+    // Conf tabs
+    if(my>=70&&my<=94){ this.confTab=mx<W/2?'E':'W'; return; }
+    // Team buttons
+    const teams=getConfTeams(this.confTab);
+    teams.forEach((team,i)=>{
+      const{bx,by,bw,bh}=teamBtnPos(i);
+      if(mx>=bx&&mx<=bx+bw&&my>=by&&my<=by+bh) this.tempTeam=team.id;
+    });
+    // Confirm
+    if(my>=559&&my<=609&&this.tempTeam){
+      this.meta.teamId=this.tempTeam; this._save();
+      this.state=this.selectFrom||S.MENU; this.tempTeam=null; return;
+    }
+    // Keep current / back
+    if(my>=610&&this.meta.teamId){ this.state=this.selectFrom||S.MENU; this.tempTeam=null; }
+  }
+
+  _loop(ts,prev){
+    const dt=Math.min((ts-prev)/1000,0.05);
+    if(this.board) this.board.update(dt);
+    this.fx.update(dt);
+    const r=this.r, ctx=r.ctx, avail=this._availStars();
+
+    if(this.state===S.MENU){
+      r.drawMenu(this.meta);
+    } else if(this.state===S.MAP){
+      r.drawSeasonMap(this.meta, this.mapChapter, this._teamInfo());
+    } else if(this.state===S.TEAM_SELECT){
+      const displayId=this.tempTeam||this.meta.teamId;
+      r.drawTeamSelect(this.confTab, displayId, !!this.meta.teamId);
+    } else {
+      r.clearBg();
+      const lv=this._lvDef;
+      const gCur=lv.goal.type==='score'?this.score:this.iceDone;
+      const teamObj=teamById(this.meta.teamId);
+      r.drawHUD(lv,this.score,this.moves,gCur,lv.goal.target,avail,this.isDaily,teamObj);
+      r.drawGrid();
+      for(let row=0;row<C.ROWS;row++) for(let col=0;col<C.COLS;col++){
+        const tile=this.board.g[row][col];
+        const isSel=this.sel&&this.sel.col===col&&this.sel.row===row;
+        r.drawTile(tile,isSel);
+      }
+      r.drawFooter(lv,avail,avail>=C.BOOSTER_SHUFFLE);
+      this.fx.render(ctx);
+      if(this.state===S.WIN) r.drawWin(lv,this.score,this.winStars,this.isDaily,teamById(this.meta.teamId),this.winTeamPts,this.winTeamRank);
+      if(this.state===S.LOSE) r.drawLose(this.score,avail,this.isDaily);
+    }
+    requestAnimationFrame(t=>this._loop(t,ts));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// BOOTSTRAP
+// ════════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  const canvas=document.getElementById('gameCanvas');
+  const fit=()=>{
+    const s=Math.min(window.innerWidth/C.W,window.innerHeight/C.H);
+    canvas.style.width=`${C.W*s}px`; canvas.style.height=`${C.H*s}px`;
+  };
+  fit(); window.addEventListener('resize',fit);
+  new Game(canvas);
+});
+</script>
+</body>
+</html>
