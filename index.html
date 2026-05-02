@@ -7,7 +7,7 @@
   <style>
     *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
     body { background:#070d1a; display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; }
-    canvas { display:block; cursor:pointer; }
+    canvas { display:block; cursor:pointer; touch-action:none; -webkit-user-select:none; user-select:none; }
   </style>
 </head>
 <body>
@@ -528,7 +528,7 @@ class Renderer {
     ctx.restore();
   }
 
-  drawTile(tile,selected){
+  drawTile(tile,selected,dragTarget){
     if(!tile)return;
     const ctx=this.ctx,p=3,S=C.TS,x=tile.x+p,y=tile.y+p,w=S-p*2,h=S-p*2;
     ctx.save(); ctx.globalAlpha=tile.alpha;
@@ -540,6 +540,10 @@ class Renderer {
     if(tile.isIce)       this._drawRef(ctx,x,y,w,h);
     else if(tile.isPower)this._drawPower(ctx,x,y,w,h,tile);
     else                 this._drawNormal(ctx,x,y,w,h,tile.type);
+    if(dragTarget&&!selected){
+      ctx.strokeStyle='rgba(93,173,226,0.9)';ctx.lineWidth=3;rrect(ctx,x-2,y-2,w+4,h+4,9);ctx.stroke();
+      ctx.shadowColor='#5dade2';ctx.shadowBlur=14;ctx.strokeStyle='rgba(93,173,226,0.35)';ctx.lineWidth=1.5;rrect(ctx,x-5,y-5,w+10,h+10,11);ctx.stroke();ctx.shadowBlur=0;
+    }
     if(selected){
       ctx.strokeStyle='#f39c12';ctx.lineWidth=3;rrect(ctx,x-2,y-2,w+4,h+4,9);ctx.stroke();
       ctx.shadowColor='#f39c12';ctx.shadowBlur=14;ctx.strokeStyle='rgba(243,156,18,0.4)';ctx.lineWidth=1.5;rrect(ctx,x-5,y-5,w+10,h+10,11);ctx.stroke();ctx.shadowBlur=0;
@@ -898,10 +902,14 @@ class Game {
     this.confTab='E'; this.tempTeam=null; this.selectFrom=S.MENU;
     this.winTeamPts=0; this.winTeamRank=0;
     this.meta={unlocked:1,stars:{},spent:0,dailyBest:null,teamId:null,teamPts:0,levelClears:[]};
+    this.dragSrc=null; this.dragOver=null; this._touchOrigin=null;
     this._load();
     // First launch → choose team
     if(!this.meta.teamId) this.state=S.TEAM_SELECT;
     canvas.addEventListener('click',e=>this._click(e));
+    canvas.addEventListener('touchstart',e=>this._touchStart(e),{passive:false});
+    canvas.addEventListener('touchmove', e=>this._touchMove(e), {passive:false});
+    canvas.addEventListener('touchend',  e=>this._touchEnd(e),  {passive:false});
     requestAnimationFrame(t=>this._loop(t,t));
   }
 
@@ -1006,6 +1014,67 @@ class Game {
     this.meta.spent=(this.meta.spent||0)+C.BOOSTER_CONTINUE; this._save();
     this.moves+=5; this.state=S.PLAY;
     this.sfx.win(); this.fx.text(C.W/2,C.OY+36,'+5 MOVES! ⚡','#f39c12');
+  }
+
+  // ── Touch / drag support ─────────────────────────────────────────
+  _canvasXY(cx,cy){
+    const rc=this.r.canvas.getBoundingClientRect();
+    return{mx:(cx-rc.left)*(C.W/rc.width),my:(cy-rc.top)*(C.H/rc.height)};
+  }
+
+  _touchStart(e){
+    if(e.touches.length>1)return;
+    e.preventDefault();
+    this.sfx.resume();
+    const t=e.touches[0];
+    this._touchOrigin={cx:t.clientX,cy:t.clientY};
+    if(this.state!==S.PLAY)return;
+    const{mx,my}=this._canvasXY(t.clientX,t.clientY);
+    const col=Math.floor((mx-C.OX)/C.TS),row=Math.floor((my-C.OY)/C.TS);
+    if(col>=0&&col<C.COLS&&row>=0&&row<C.ROWS){
+      const tile=this.board.at(col,row);
+      if(tile&&!tile.isIce)this.dragSrc={col,row};
+    }
+  }
+
+  _touchMove(e){
+    if(!this.dragSrc||this.state!==S.PLAY)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    const{mx,my}=this._canvasXY(t.clientX,t.clientY);
+    const col=Math.floor((mx-C.OX)/C.TS),row=Math.floor((my-C.OY)/C.TS);
+    if(col<0||col>=C.COLS||row<0||row>=C.ROWS){this.dragOver=null;return;}
+    const{col:sc,row:sr}=this.dragSrc;
+    this.dragOver=(Math.abs(sc-col)+Math.abs(sr-row)===1)?{col,row}:null;
+  }
+
+  _touchEnd(e){
+    e.preventDefault();
+    const t=e.changedTouches[0], o=this._touchOrigin;
+    const moved=o&&(Math.abs(t.clientX-o.cx)>10||Math.abs(t.clientY-o.cy)>10);
+    const src=this.dragSrc, over=this.dragOver;
+    this.dragSrc=null; this.dragOver=null; this._touchOrigin=null;
+
+    if(!moved){
+      // Tap — route through the same logic as a mouse click
+      if(o)this._click({clientX:o.cx,clientY:o.cy});
+      return;
+    }
+    // Drag with no valid adjacent target — cancel
+    if(!src||!over||this.state!==S.PLAY){this.sel=null;return;}
+
+    // Commit the drag swap
+    this.sel=null;
+    const{col:sc,row:sr}=src,{col,row}=over;
+    const tile=this.board.at(col,row);
+    if(tile?.isPower){this._detonate(col,row);return;}
+    if(this.board.at(sc,sr)?.isPower){this._detonate(sc,sr);return;}
+    this.board.swap(sc,sr,col,row); this.state=S.WAIT;
+    setTimeout(()=>{
+      const hits=this.board.markMatches();
+      if(!hits.length){this.board.unswap(sc,sr,col,row);this.sfx.bad();setTimeout(()=>{this.state=S.PLAY;},230);}
+      else{this.moves--;this.combo=0;this._resolve();}
+    },200);
   }
 
   _resolve(){
@@ -1156,8 +1225,9 @@ class Game {
       r.drawGrid();
       for(let row=0;row<C.ROWS;row++) for(let col=0;col<C.COLS;col++){
         const tile=this.board.g[row][col];
-        const isSel=this.sel&&this.sel.col===col&&this.sel.row===row;
-        r.drawTile(tile,isSel);
+        const isSel=(this.sel&&this.sel.col===col&&this.sel.row===row)||(this.dragSrc&&this.dragSrc.col===col&&this.dragSrc.row===row);
+        const isDragTarget=!!(this.dragOver&&this.dragOver.col===col&&this.dragOver.row===row);
+        r.drawTile(tile,isSel,isDragTarget);
       }
       r.drawFooter(lv,avail,avail>=C.BOOSTER_SHUFFLE);
       this.fx.render(ctx);
