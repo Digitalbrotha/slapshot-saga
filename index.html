@@ -540,6 +540,10 @@ class Renderer {
     if(tile.isIce)       this._drawRef(ctx,x,y,w,h);
     else if(tile.isPower)this._drawPower(ctx,x,y,w,h,tile);
     else                 this._drawNormal(ctx,x,y,w,h,tile.type);
+    if(tile.isIce){
+      ctx.strokeStyle='rgba(231,76,60,0.85)';ctx.lineWidth=2.5;
+      rrect(ctx,x-1,y-1,w+2,h+2,7);ctx.stroke();
+    }
     if(dragTarget&&!selected){
       ctx.strokeStyle='rgba(93,173,226,0.9)';ctx.lineWidth=3;rrect(ctx,x-2,y-2,w+4,h+4,9);ctx.stroke();
       ctx.shadowColor='#5dade2';ctx.shadowBlur=14;ctx.strokeStyle='rgba(93,173,226,0.35)';ctx.lineWidth=1.5;rrect(ctx,x-5,y-5,w+10,h+10,11);ctx.stroke();ctx.shadowBlur=0;
