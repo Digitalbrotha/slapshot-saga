@@ -802,7 +802,7 @@ class Renderer {
 
   // ── Mission popup ───────────────────────────────────────────────────
   drawMissionPopup(level, team, t){
-    const ctx=this.ctx, W=C.W, MAX=3.0;
+    const ctx=this.ctx, W=C.W, MAX=5.0;
     const pct=t/MAX;                          // 1.0 → 0.0
     const fade=pct>0.15?1:pct/0.15;          // fade out in last 0.15s
 
@@ -1004,7 +1004,7 @@ class Game {
     this.score=0; this.moves=lv.moves; this.combo=0; this.iceDone=0;
     this.sel=null; this.winTeamPts=0; this.winTeamRank=0;
     this.state=S.PLAY;
-    this.missionPopup=(!daily&&getLevelTheme(lv.id,this.meta.teamId))?{t:3.0}:null;
+    this.missionPopup=(!daily&&getLevelTheme(lv.id,this.meta.teamId))?{t:5.0}:null;
   }
 
   _click(e){
