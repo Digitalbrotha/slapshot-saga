@@ -800,6 +800,56 @@ class Renderer {
     ctx.restore();
   }
 
+  // ── Mission popup ───────────────────────────────────────────────────
+  drawMissionPopup(level, team, t){
+    const ctx=this.ctx, W=C.W, MAX=3.0;
+    const pct=t/MAX;                          // 1.0 → 0.0
+    const fade=pct>0.15?1:pct/0.15;          // fade out in last 0.15s
+
+    const cw=W-56, ch=148;
+    const cx=W/2, cy=C.OY+C.ROWS*C.TS/2;    // center of the board
+
+    ctx.save(); ctx.globalAlpha=fade;
+
+    // Shadow / backdrop
+    ctx.fillStyle='rgba(2,8,22,0.88)'; rrect(ctx,cx-cw/2,cy-ch/2,cw,ch,18); ctx.fill();
+    ctx.strokeStyle='rgba(255,215,60,0.65)'; ctx.lineWidth=2;
+    rrect(ctx,cx-cw/2,cy-ch/2,cw,ch,18); ctx.stroke();
+
+    // Level name
+    ctx.fillStyle=C.CLR.WHITE; ctx.font='bold 15px "Segoe UI",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`LV${level.id}  ·  ${level.name.toUpperCase()}`,cx,cy-ch/2+28);
+
+    // Divider
+    ctx.strokeStyle='rgba(255,215,60,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(cx-cw/2+20,cy-ch/2+38); ctx.lineTo(cx+cw/2-20,cy-ch/2+38); ctx.stroke();
+
+    // Mission text
+    const th=team?getLevelTheme(level.id,team.id):null;
+    if(th){
+      ctx.fillStyle='rgba(255,215,60,0.92)';
+      ctx.font='italic 13px "Segoe UI",sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🏒  '+th, cx, cy-ch/2+62, cw-28);
+    }
+
+    // Tap-to-skip hint
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px "Segoe UI",sans-serif';
+    ctx.fillText('Tap anywhere to skip',cx,cy+ch/2-28);
+
+    // Progress bar track
+    const bx=cx-cw/2+18, by=cy+ch/2-18, bw=cw-36, bh=7;
+    ctx.fillStyle='rgba(255,255,255,0.1)'; rrect(ctx,bx,by,bw,bh,4); ctx.fill();
+
+    // Progress bar fill — shifts from gold to red as time runs out
+    if(pct>0){
+      const hue=Math.round(pct*42);          // 42=gold, 0=red
+      ctx.fillStyle=`hsl(${hue},90%,54%)`;
+      rrect(ctx,bx,by,bw*pct,bh,4); ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
   // ── WIN screen ──────────────────────────────────────────────────────
   drawWin(level, score, stars, isDaily, team, ptsGained, rank){
     const ctx=this.ctx, W=C.W, H=C.H;
@@ -906,7 +956,7 @@ class Game {
     this.confTab='E'; this.tempTeam=null; this.selectFrom=S.MENU;
     this.winTeamPts=0; this.winTeamRank=0;
     this.meta={unlocked:1,stars:{},spent:0,dailyBest:null,teamId:null,teamPts:0,levelClears:[]};
-    this.dragSrc=null; this.dragOver=null; this._touchOrigin=null;
+    this.dragSrc=null; this.dragOver=null; this._touchOrigin=null; this.missionPopup=null;
     this._load();
     // First launch → choose team
     if(!this.meta.teamId) this.state=S.TEAM_SELECT;
@@ -954,6 +1004,7 @@ class Game {
     this.score=0; this.moves=lv.moves; this.combo=0; this.iceDone=0;
     this.sel=null; this.winTeamPts=0; this.winTeamRank=0;
     this.state=S.PLAY;
+    this.missionPopup=(!daily&&getLevelTheme(lv.id,this.meta.teamId))?{t:3.0}:null;
   }
 
   _click(e){
@@ -969,6 +1020,7 @@ class Game {
       case S.TEAM_SELECT:this._teamSelectClick(mx,my); return;
     }
     if(this.state!==S.PLAY) return;
+    if(this.missionPopup){this.missionPopup=null;return;}
 
     const fy=C.OY+C.ROWS*C.TS+6;
     if(my>=fy&&mx<=145){ this._doShuffle(); return; }
@@ -1064,6 +1116,8 @@ class Game {
       if(o)this._click({clientX:o.cx,clientY:o.cy});
       return;
     }
+    // Dismiss mission popup on any drag gesture
+    if(this.missionPopup){this.missionPopup=null;return;}
     // Drag with no valid adjacent target — cancel
     if(!src||!over||this.state!==S.PLAY){this.sel=null;return;}
 
@@ -1235,6 +1289,11 @@ class Game {
       }
       r.drawFooter(lv,avail,avail>=C.BOOSTER_SHUFFLE);
       this.fx.render(ctx);
+      if(this.missionPopup){
+        this.missionPopup.t-=dt;
+        if(this.missionPopup.t<=0)this.missionPopup=null;
+        else r.drawMissionPopup(lv,teamById(this.meta.teamId),this.missionPopup.t);
+      }
       if(this.state===S.WIN) r.drawWin(lv,this.score,this.winStars,this.isDaily,teamById(this.meta.teamId),this.winTeamPts,this.winTeamRank);
       if(this.state===S.LOSE) r.drawLose(this.score,avail,this.isDaily);
     }
