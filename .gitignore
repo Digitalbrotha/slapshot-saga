@@ -1,2 +1,11 @@
 .claude/
 .vercel/
+
+# Capacitor / Node
+node_modules/
+
+# CocoaPods — install on Mac with: cd ios/App && pod install
+ios/App/Pods/
+
+# Capacitor auto-syncs web assets here; not source of truth
+ios/App/App/public/
