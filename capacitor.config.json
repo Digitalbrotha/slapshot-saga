@@ -1,5 +1,12 @@
 {
   "appId": "com.digitalbrotha.slapshotsaga",
   "appName": "Slapshot Saga",
-  "webDir": "www"
+  "webDir": "www",
+  "backgroundColor": "#070d1a",
+  "ios": {
+    "backgroundColor": "#070d1a",
+    "preferredContentMode": "mobile",
+    "allowsLinkPreview": false,
+    "scrollEnabled": false
+  }
 }
