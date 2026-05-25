@@ -52,12 +52,12 @@
     /* Cards */
     .grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
     }
 
-    @media (max-width: 900px) {
-      .grid { grid-template-columns: 1fr; max-width: 440px; margin: 0 auto; }
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
     }
 
     .card {
@@ -320,6 +320,70 @@
     <text x="27" y="27" text-anchor="middle" dominant-baseline="central" fill="#1a1a2e" font-size="15" font-weight="900" font-family="Arial, sans-serif">8</text>
   </symbol>
 
+  <!-- ── JERSEYS: path M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z ── -->
+  <!-- Collar V: (17,10)→(27,20)→(37,10). Sleeve cuffs at bottom of sleeves. -->
+
+  <symbol id="je-bra" viewBox="0 0 54 54"><!-- Brazil: yellow, green trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#FFD700"/>
+    <!-- Sheen top -->
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.14)"/>
+    <!-- Collar V trim -->
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#009C3B" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- Sleeve cuffs -->
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#009C3B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#009C3B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="#1a1a2e" font-size="13" font-weight="900" font-family="Arial,sans-serif">10</text>
+  </symbol>
+
+  <symbol id="je-fra" viewBox="0 0 54 54"><!-- France: dark blue, red trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#002395"/>
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.1)"/>
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#ED2939" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#ED2939" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#ED2939" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="white" font-size="13" font-weight="900" font-family="Arial,sans-serif">7</text>
+  </symbol>
+
+  <symbol id="je-eng" viewBox="0 0 54 54"><!-- England: red, white trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#CE1124"/>
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.12)"/>
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="white" font-size="13" font-weight="900" font-family="Arial,sans-serif">9</text>
+  </symbol>
+
+  <symbol id="je-arg" viewBox="0 0 54 54"><!-- Argentina: sky blue + white stripes, white trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#74ACDF"/>
+    <!-- Vertical stripes (3 blue, 2 white) -->
+    <rect x="17" y="26" width="5" height="24" fill="rgba(255,255,255,0.5)"/>
+    <rect x="26" y="26" width="2" height="24" fill="rgba(255,255,255,0.5)"/>
+    <rect x="32" y="26" width="5" height="24" fill="rgba(255,255,255,0.5)"/>
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.13)"/>
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="#1a1a2e" font-size="13" font-weight="900" font-family="Arial,sans-serif">10</text>
+  </symbol>
+
+  <symbol id="je-ned" viewBox="0 0 54 54"><!-- Netherlands: orange, dark blue trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#FF6700"/>
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.13)"/>
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#1B3869" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#1B3869" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#1B3869" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="white" font-size="13" font-weight="900" font-family="Arial,sans-serif">11</text>
+  </symbol>
+
+  <symbol id="je-ger" viewBox="0 0 54 54"><!-- Germany: white, black trim -->
+    <path d="M4,14 L4,24 L11,26 L11,50 H43 L43,26 L50,24 L50,14 L37,10 L27,20 L17,10 Z" fill="#E0E0E0"/>
+    <path d="M4,14 L4,22 L11,24 L11,30 H43 L43,24 L50,22 L50,14 L37,10 L27,20 L17,10 Z" fill="rgba(255,255,255,0.22)"/>
+    <path d="M17,10 L27,20 L37,10" fill="none" stroke="#1C1C1C" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M4,21 L4,24 L11,26" fill="none" stroke="#1C1C1C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M43,26 L50,24 L50,21" fill="none" stroke="#1C1C1C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="27" y="38" text-anchor="middle" dominant-baseline="central" fill="#1a1a2e" font-size="13" font-weight="900" font-family="Arial,sans-serif">8</text>
+  </symbol>
+
 </svg>
 <!-- ── end symbol library ── -->
 
@@ -572,6 +636,83 @@
         </div>
       </div>
     </div><!-- /card 3 -->
+
+    <!-- ══════════════════════════════════════
+         CONCEPT 04 — JERSEYS
+    ══════════════════════════════════════ -->
+    <div class="card">
+      <div class="tag">Concept 04</div>
+      <h2>Jersey Tiles</h2>
+      <p>Each tile is a front-facing soccer jersey in the national team color. V-neck collar and sleeve cuffs use the accent color. Simple, clean, and instantly readable on the board.</p>
+
+      <div class="section-lbl">Tile Examples</div>
+      <div class="showcase">
+
+        <div class="tile-item">
+          <div class="tile" style="background:#3d3300">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-bra"/></svg>
+          </div>
+          <span class="tile-lbl">Brazil</span>
+        </div>
+
+        <div class="tile-item">
+          <div class="tile" style="background:#000e40">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-fra"/></svg>
+          </div>
+          <span class="tile-lbl">France</span>
+        </div>
+
+        <div class="tile-item">
+          <div class="tile" style="background:#5a0810">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-eng"/></svg>
+          </div>
+          <span class="tile-lbl">England</span>
+        </div>
+
+        <div class="tile-item">
+          <div class="tile" style="background:#1e4060">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-arg"/></svg>
+          </div>
+          <span class="tile-lbl">Argentina</span>
+        </div>
+
+        <div class="tile-item">
+          <div class="tile" style="background:#5c2600">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-ned"/></svg>
+          </div>
+          <span class="tile-lbl">Netherlands</span>
+        </div>
+
+        <div class="tile-item">
+          <div class="tile" style="background:#383838">
+            <svg viewBox="0 0 54 54" width="54" height="54"><use href="#je-ger"/></svg>
+          </div>
+          <span class="tile-lbl">Germany</span>
+        </div>
+
+      </div><!-- /showcase -->
+
+      <div class="divider">
+        <div class="section-lbl">Board Preview (3 × 5)</div>
+        <div class="board">
+          <div class="bcell" style="background:#3d3300"><svg viewBox="0 0 54 54"><use href="#je-bra"/></svg></div>
+          <div class="bcell" style="background:#5a0810"><svg viewBox="0 0 54 54"><use href="#je-eng"/></svg></div>
+          <div class="bcell" style="background:#5c2600"><svg viewBox="0 0 54 54"><use href="#je-ned"/></svg></div>
+          <div class="bcell" style="background:#000e40"><svg viewBox="0 0 54 54"><use href="#je-fra"/></svg></div>
+          <div class="bcell" style="background:#1e4060"><svg viewBox="0 0 54 54"><use href="#je-arg"/></svg></div>
+          <div class="bcell" style="background:#1e4060"><svg viewBox="0 0 54 54"><use href="#je-arg"/></svg></div>
+          <div class="bcell" style="background:#383838"><svg viewBox="0 0 54 54"><use href="#je-ger"/></svg></div>
+          <div class="bcell" style="background:#000e40"><svg viewBox="0 0 54 54"><use href="#je-fra"/></svg></div>
+          <div class="bcell" style="background:#3d3300"><svg viewBox="0 0 54 54"><use href="#je-bra"/></svg></div>
+          <div class="bcell" style="background:#5a0810"><svg viewBox="0 0 54 54"><use href="#je-eng"/></svg></div>
+          <div class="bcell" style="background:#5c2600"><svg viewBox="0 0 54 54"><use href="#je-ned"/></svg></div>
+          <div class="bcell" style="background:#3d3300"><svg viewBox="0 0 54 54"><use href="#je-bra"/></svg></div>
+          <div class="bcell" style="background:#1e4060"><svg viewBox="0 0 54 54"><use href="#je-arg"/></svg></div>
+          <div class="bcell" style="background:#383838"><svg viewBox="0 0 54 54"><use href="#je-ger"/></svg></div>
+          <div class="bcell" style="background:#000e40"><svg viewBox="0 0 54 54"><use href="#je-fra"/></svg></div>
+        </div>
+      </div>
+    </div><!-- /card 4 -->
 
   </div><!-- /grid -->
 </div><!-- /page -->
