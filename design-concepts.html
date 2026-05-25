@@ -8,14 +8,20 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #0b1622;
+      /* Pitch green base with mowed grass stripes */
+      background-color: #1a6b2e;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 56px,
+        rgba(0,0,0,0.045)      56px, rgba(0,0,0,0.045)      112px
+      );
       color: #dce8f5;
       font-family: Arial, Helvetica, sans-serif;
       min-height: 100vh;
       padding: 48px 20px 80px;
     }
 
-    .page { max-width: 1200px; margin: 0 auto; }
+    .page { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
 
     /* Header */
     header { text-align: center; margin-bottom: 56px; }
@@ -47,7 +53,16 @@
       background-clip: text;
     }
 
-    .sub { color: #6b8099; font-size: 15px; }
+    .sub { color: rgba(255,255,255,0.6); font-size: 15px; }
+
+    /* Pitch markings overlay */
+    .pitch {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
 
     /* Cards */
     .grid {
@@ -61,10 +76,11 @@
     }
 
     .card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(0,20,5,0.62);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 22px;
       padding: 26px;
+      backdrop-filter: blur(6px);
     }
 
     .tag {
@@ -142,6 +158,25 @@
   </style>
 </head>
 <body>
+
+<!-- ── Pitch markings overlay ── -->
+<svg class="pitch" xmlns="http://www.w3.org/2000/svg">
+  <!-- Touchlines -->
+  <line x1="3%" y1="0" x2="3%" y2="100%" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
+  <line x1="97%" y1="0" x2="97%" y2="100%" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
+  <!-- Halfway line -->
+  <line x1="3%" y1="50%" x2="97%" y2="50%" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+  <!-- Center circle -->
+  <circle cx="50%" cy="50%" r="100" fill="none" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
+  <!-- Center spot -->
+  <circle cx="50%" cy="50%" r="4" fill="rgba(255,255,255,0.18)"/>
+  <!-- Penalty areas (top + bottom) -->
+  <rect x="28%" y="0" width="44%" height="13%" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+  <rect x="28%" y="87%" width="44%" height="13%" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+  <!-- Goal areas -->
+  <rect x="38%" y="0" width="24%" height="5%" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+  <rect x="38%" y="95%" width="24%" height="5%" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+</svg>
 
 <!-- ═══════════════════════════════════════════════════════════════
      SHARED SVG SYMBOL LIBRARY (hidden)
